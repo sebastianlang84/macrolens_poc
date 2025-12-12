@@ -31,6 +31,7 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
   - Provider-Fehler-Isolation: [`tests/test_m2_provider_robustness.py`](tests/test_m2_provider_robustness.py:1)
   - Matrix-Status Merge/Persistenz: [`tests/test_m3_matrix_status_persist.py`](tests/test_m3_matrix_status_persist.py:1)
   - Report v1 Deltas/Risk Flags: [`tests/test_m3_report_v1_deltas.py`](tests/test_m3_report_v1_deltas.py:1), [`tests/test_m3_report_v1_risk_flags.py`](tests/test_m3_report_v1_risk_flags.py:1)
+- Developer-Tasks für CLI und Checks via `Makefile`/`justfile` (`run_all`, `run_one`, `report`, `lint`, `format`, `smoke`)
 
 ### Changed
 

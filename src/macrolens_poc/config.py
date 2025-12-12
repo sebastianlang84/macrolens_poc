@@ -12,6 +12,7 @@ class PathsConfig(BaseModel):
     data_dir: Path = Field(default=Path("data"))
     logs_dir: Path = Field(default=Path("logs"))
     reports_dir: Path = Field(default=Path("reports"))
+    metadata_db: Path = Field(default=Path("data/metadata.sqlite"))
 
 
 class Settings(BaseModel):

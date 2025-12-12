@@ -13,14 +13,20 @@ from macrolens_poc.logging_utils import (
     new_run_context,
     run_summary_event,
 )
-from macrolens_poc.pipeline import run_series
+from macrolens_poc.pipeline import SeriesRunResult, run_series
 from macrolens_poc.report import generate_report_v1
 from macrolens_poc.sources import load_sources_matrix
+from macrolens_poc.sources.matrix import SeriesSpec
 from macrolens_poc.sources.matrix_status import (
     default_matrix_status_path,
     load_matrix_status,
     merge_matrix_status,
     save_matrix_status,
+)
+from macrolens_poc.storage.metadata_db import (
+    SeriesMetadataRecord,
+    init_db as init_metadata_db,
+    upsert_series_metadata,
 )
 
 app = typer.Typer(add_completion=False, help="macrolens_poc CLI (Milestone M0 skeleton)")
@@ -33,9 +39,7 @@ def _ensure_dirs(settings: Settings) -> None:
     init_metadata_db(settings.paths.metadata_db)
 
 
-def _record_series_metadata(
-    settings: Settings, spec: SeriesSpec, result: SeriesRunResult
-) -> None:
+def _record_series_metadata(settings: Settings, spec: SeriesSpec, result: SeriesRunResult) -> None:
     metadata_record = SeriesMetadataRecord(
         series_id=spec.id,
         provider=spec.provider,
@@ -79,6 +83,79 @@ def main(
     ctx.obj = {"settings": settings}
 
 
+def _log_series_run(logger: JsonlLogger, *, run_id: str, result: SeriesRunResult) -> None:
+    event = {
+        "event": "series_run",
+        "run_id": run_id,
+        "series_id": result.series_id,
+        "provider": result.provider,
+        "status": result.status,
+        "message": result.message,
+        "stored_path": str(result.stored_path) if result.stored_path is not None else None,
+        "new_points": result.new_points,
+        "last_observation_date": result.last_observation_date.isoformat() if result.last_observation_date else None,
+        "run_at": result.run_at.isoformat(),
+        "revision_overwrites_count": getattr(result, "revision_overwrites_count", 0),
+    }
+
+    if getattr(result, "revision_overwrites_sample", None):
+        event["revision_overwrites_sample"] = result.revision_overwrites_sample
+    if getattr(result, "error_type", None):
+        event["error_type"] = result.error_type
+    if getattr(result, "error_message", None):
+        event["error_message"] = result.error_message
+
+    logger.log(event)
+
+
+def _persist_matrix_status(
+    *,
+    logger: JsonlLogger,
+    run_id: str,
+    data_dir: Path,
+    results: list[SeriesRunResult],
+) -> dict:
+    matrix_status_entries_updated = 0
+    matrix_status_persisted = False
+    matrix_status_path = default_matrix_status_path(data_dir)
+
+    try:
+        existing_status = load_matrix_status(matrix_status_path)
+        merge_result = merge_matrix_status(
+            existing=existing_status,
+            run_results=results,
+            run_at_utc=datetime.now(timezone.utc),
+        )
+        save_matrix_status(matrix_status_path, merge_result.merged)
+        matrix_status_entries_updated = merge_result.updated_entries
+        matrix_status_persisted = True
+
+        logger.log(
+            {
+                "event": "matrix_status_saved",
+                "run_id": run_id,
+                "path": str(matrix_status_path),
+                "updated_entries": matrix_status_entries_updated,
+            }
+        )
+    except Exception as exc:
+        logger.log(
+            {
+                "event": "matrix_status_save_failed",
+                "run_id": run_id,
+                "path": str(matrix_status_path),
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+            }
+        )
+
+    return {
+        "matrix_status_entries_updated": matrix_status_entries_updated,
+        "matrix_status_path": str(matrix_status_path),
+        "matrix_status_persisted": matrix_status_persisted,
+    }
+
+
 @app.command("run-all")
 def run_all(
     ctx: typer.Context,
@@ -117,7 +194,7 @@ def run_all(
 
     status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
     total_new_points = 0
-    results = []
+    results: list[SeriesRunResult] = []
 
     for spec in enabled:
         result = run_series(settings=settings, spec=spec, lookback_days=lookback_days)
@@ -125,62 +202,19 @@ def run_all(
         status_counts[result.status] = status_counts.get(result.status, 0) + 1
         total_new_points += result.new_points
 
-        event = {
-            "event": "series_run",
-            "run_id": run_ctx.run_id,
-            "series_id": result.series_id,
-            "provider": result.provider,
-            "status": result.status,
-            "message": result.message,
-            "stored_path": str(result.stored_path) if result.stored_path is not None else None,
-            "new_points": result.new_points,
-            "revision_overwrites_count": getattr(result, "revision_overwrites_count", 0),
-        }
-        if getattr(result, "revision_overwrites_sample", None):
-            event["revision_overwrites_sample"] = result.revision_overwrites_sample
-        if getattr(result, "error_type", None):
-            event["error_type"] = result.error_type
-        if getattr(result, "error_message", None):
-            event["error_message"] = result.error_message
-        logger.log(event)
+        _record_series_metadata(settings, spec, result)
+        _log_series_run(logger, run_id=run_ctx.run_id, result=result)
 
-    matrix_status_entries_updated = 0
-    matrix_status_persisted = False
-    matrix_status_path = default_matrix_status_path(settings.paths.data_dir)
-    try:
-        existing_status = load_matrix_status(matrix_status_path)
-        merge_result = merge_matrix_status(
-            existing=existing_status,
-            run_results=results,
-            run_at_utc=datetime.now(timezone.utc),
-        )
-        save_matrix_status(matrix_status_path, merge_result.merged)
-        matrix_status_entries_updated = merge_result.updated_entries
-        matrix_status_persisted = True
-        logger.log(
-            {
-                "event": "matrix_status_saved",
-                "run_id": run_ctx.run_id,
-                "path": str(matrix_status_path),
-                "updated_entries": matrix_status_entries_updated,
-            }
-        )
-    except Exception as exc:
-        logger.log(
-            {
-                "event": "matrix_status_save_failed",
-                "run_id": run_ctx.run_id,
-                "path": str(matrix_status_path),
-                "error_type": type(exc).__name__,
-                "error_message": str(exc),
-            }
-        )
+    matrix_status_meta = _persist_matrix_status(
+        logger=logger,
+        run_id=run_ctx.run_id,
+        data_dir=settings.paths.data_dir,
+        results=results,
+    )
 
     summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
     summary["total_new_points"] = total_new_points
-    summary["matrix_status_entries_updated"] = matrix_status_entries_updated
-    summary["matrix_status_path"] = str(matrix_status_path)
-    summary["matrix_status_persisted"] = matrix_status_persisted
+    summary.update(matrix_status_meta)
     logger.log(summary)
 
 
@@ -244,71 +278,23 @@ def run_one(
         }
     )
 
-    result: SeriesRunResult = run_series(
-        settings=settings, spec=spec, lookback_days=lookback_days
-    )
-
+    result = run_series(settings=settings, spec=spec, lookback_days=lookback_days)
     _record_series_metadata(settings, spec, result)
+    _log_series_run(logger, run_id=run_ctx.run_id, result=result)
 
-    event = {
-        "event": "series_run",
-        "run_id": run_ctx.run_id,
-        "series_id": result.series_id,
-        "provider": result.provider,
-        "status": result.status,
-        "message": result.message,
-        "stored_path": str(result.stored_path) if result.stored_path is not None else None,
-        "new_points": result.new_points,
-        "revision_overwrites_count": getattr(result, "revision_overwrites_count", 0),
-    }
-    if getattr(result, "revision_overwrites_sample", None):
-        event["revision_overwrites_sample"] = result.revision_overwrites_sample
-    if getattr(result, "error_type", None):
-        event["error_type"] = result.error_type
-    if getattr(result, "error_message", None):
-        event["error_message"] = result.error_message
-    logger.log(event)
-
-    matrix_status_entries_updated = 0
-    matrix_status_persisted = False
-    matrix_status_path = default_matrix_status_path(settings.paths.data_dir)
-    try:
-        existing_status = load_matrix_status(matrix_status_path)
-        merge_result = merge_matrix_status(
-            existing=existing_status,
-            run_results=[result],
-            run_at_utc=datetime.now(timezone.utc),
-        )
-        save_matrix_status(matrix_status_path, merge_result.merged)
-        matrix_status_entries_updated = merge_result.updated_entries
-        matrix_status_persisted = True
-        logger.log(
-            {
-                "event": "matrix_status_saved",
-                "run_id": run_ctx.run_id,
-                "path": str(matrix_status_path),
-                "updated_entries": matrix_status_entries_updated,
-            }
-        )
-    except Exception as exc:
-        logger.log(
-            {
-                "event": "matrix_status_save_failed",
-                "run_id": run_ctx.run_id,
-                "path": str(matrix_status_path),
-                "error_type": type(exc).__name__,
-                "error_message": str(exc),
-            }
-        )
+    matrix_status_meta = _persist_matrix_status(
+        logger=logger,
+        run_id=run_ctx.run_id,
+        data_dir=settings.paths.data_dir,
+        results=[result],
+    )
 
     status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
     status_counts[result.status] = 1
 
     summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
     summary["total_new_points"] = result.new_points
-    summary["matrix_status_entries_updated"] = matrix_status_entries_updated
-    summary["matrix_status_path"] = str(matrix_status_path)
-    summary["matrix_status_persisted"] = matrix_status_persisted
+    summary.update(matrix_status_meta)
     logger.log(summary)
 
 

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from macrolens_poc.logging_utils import RunContext
+from macrolens_poc.pipeline.status import DEFAULT_STALE_THRESHOLD_DAYS, compute_data_age_days, is_stale
 from macrolens_poc.sources.matrix import SeriesSpec
 from macrolens_poc.storage.parquet_store import load_series
 
@@ -25,6 +26,7 @@ class SeriesReport:
     last_date: Optional[pd.Timestamp]
     last_value: Optional[float]
     deltas: Dict[int, Optional[float]]
+    data_age_days: Optional[int]
     path: Path
 
 
@@ -60,6 +62,9 @@ def generate_series_report(
     *,
     spec: SeriesSpec,
     data_dir: Path,
+    data_tz: str = "UTC",
+    stale_threshold_days: int = DEFAULT_STALE_THRESHOLD_DAYS,
+    reference_time: Optional[datetime] = None,
     windows: List[int] = DEFAULT_DELTA_WINDOWS,
 ) -> SeriesReport:
     """Build a per-series report from stored Parquet data."""
@@ -76,6 +81,7 @@ def generate_series_report(
             last_date=None,
             last_value=None,
             deltas={w: None for w in windows},
+            data_age_days=None,
             path=path,
         )
 
@@ -88,14 +94,25 @@ def generate_series_report(
             last_date=None,
             last_value=None,
             deltas={w: None for w in windows},
+            data_age_days=None,
             path=path,
         )
 
     last_row = df.sort_values("date").iloc[-1]
     deltas = compute_deltas(df, windows=windows)
 
+    now = reference_time or datetime.now(ZoneInfo(data_tz))
+    data_age_days = compute_data_age_days(last_date=last_row["date"], now=now)
+
     status = "ok" if all(v is not None for v in deltas.values()) else "warn"
     message = "ok" if status == "ok" else "insufficient history for some deltas"
+
+    if is_stale(last_date=last_row["date"], now=now, threshold_days=stale_threshold_days):
+        status = "stale"
+        message = (
+            f"stale: last update {last_row['date'].date()} age {data_age_days}d "
+            f"(threshold {stale_threshold_days}d)"
+        )
 
     return SeriesReport(
         series_id=spec.id,
@@ -105,6 +122,7 @@ def generate_series_report(
         last_date=last_row["date"],
         last_value=float(last_row["value"]),
         deltas=deltas,
+        data_age_days=data_age_days,
         path=path,
     )
 
@@ -202,8 +220,42 @@ def _render_json_payload(
             "path": str(rep.path),
             "last_date": _format_date(rep.last_date, tz),
             "last_value": rep.last_value,
+            "data_age_days": rep.data_age_days,
             "deltas": {f"d{w}": rep.deltas.get(w) for w in windows},
         }
         serializable["series"].append(entry)
 
     return json.dumps(serializable, indent=2, ensure_ascii=False)
+
+
+def write_status_report(
+    *, reports: List[SeriesReport], reports_dir: Path, report_tz: str, run_ctx: RunContext
+) -> Dict[str, Path]:
+    tz = ZoneInfo(report_tz)
+    ts_tag = run_ctx.started_at_utc.strftime("%Y%m%d")
+
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    json_path = reports_dir / f"status-{ts_tag}.json"
+    csv_path = reports_dir / f"status-{ts_tag}.csv"
+
+    payload: List[Dict[str, object]] = []
+    for rep in reports:
+        payload.append(
+            {
+                "id": rep.series_id,
+                "provider": rep.provider,
+                "status": rep.status,
+                "message": rep.message,
+                "last_date": _format_date(rep.last_date, tz),
+                "data_age_days": rep.data_age_days,
+                "path": str(rep.path),
+            }
+        )
+
+    json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    df = pd.DataFrame(payload)
+    df.to_csv(csv_path, index=False)
+
+    return {"json": json_path, "csv": csv_path}

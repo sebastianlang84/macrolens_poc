@@ -24,7 +24,7 @@
 
 ## Later — Monitoring, DX, Open Questions
 
-- [ ] Stale-series detection + „Matrix status“ Export
+- [x] Stale-series detection + „Matrix status“ Export
 - [ ] Optional: SQLite Index für Metadaten
 - [ ] DX: Makefile/justfile (z. B. `run_all`, `run_one`, `report`)
 - [x] Tests: Matrix-Loader + Storage-Merge (kritische Logik)

@@ -17,6 +17,39 @@ python -m pip install -e '.[dev]'
 python -m macrolens_poc.cli --help
 ```
 
+## Developer Commands (Make/Just)
+
+Nach `python -m pip install -e '.[dev]'` stehen parallele Targets in `Makefile` und `justfile` bereit:
+
+- `run_all` – alle enabled Serien backfillen (`LOOKBACK_DAYS` optional, Default: `3650`).
+- `run_one <id>` – eine Serie per `--id` aus [`config/sources_matrix.yaml`](config/sources_matrix.yaml:1) backfillen (`LOOKBACK_DAYS` optional).
+- `report` – Markdown/JSON-Report unter [`reports/`](reports:1) erzeugen.
+- `lint` – statische Prüfung via `ruff` auf `src/` und `tests/`.
+- `format` – Formatierung via `black` auf `src/` und `tests/`.
+- `smoke` – kurzer Check via `pytest -q` (Minimaltest).
+
+Beispiele:
+
+```bash
+make run_all
+make run_one ID=us_cpi LOOKBACK_DAYS=180
+make report
+make lint
+make format
+make smoke
+```
+
+Alternativ mit `just`:
+
+```bash
+just run_all
+just run_one us_cpi 180
+just report
+just lint
+just format
+just smoke
+```
+
 ## Konfiguration
 
 Konfiguration ist bewusst lokal gehalten (keine Secrets in Git). Vorlagen im Repo:

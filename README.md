@@ -73,6 +73,7 @@ Die gleichen Konventionen existieren auch in der YAML-Konfiguration (`data_tz`, 
 Repo-Verzeichnisse sind angelegt (Platzhalter via `.gitkeep`):
 
 - Datenablage: [`data/.gitkeep`](data/.gitkeep:1) (Time-Series Output: `data/series/{id}.parquet`)
+- Metadaten-Index: `data/metadata.sqlite` (Serien-Metadaten + Status/letzte Aktualisierung)
 - Logs: [`logs/.gitkeep`](logs/.gitkeep:1) (JSONL: `logs/run-YYYYMMDD.jsonl`)
 - Reports: [`reports/.gitkeep`](reports/.gitkeep:1)
 

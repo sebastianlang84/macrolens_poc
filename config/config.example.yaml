@@ -17,3 +17,4 @@ paths:
   data_dir: "data"
   logs_dir: "logs"
   reports_dir: "reports"
+  metadata_db: "data/metadata.sqlite"

@@ -8,7 +8,8 @@ from macrolens_poc.config import load_settings
 
 
 def test_config_loads_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Ensure env does not affect defaults
+    # Ensure env/.env does not affect defaults
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DATA_TZ", raising=False)
     monkeypatch.delenv("REPORT_TZ", raising=False)
     monkeypatch.delenv("FRED_API_KEY", raising=False)

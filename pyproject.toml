@@ -1,6 +1,6 @@
 [project]
 name = "macrolens-poc"
-version = "0.0.0"
+version = "0.1.0"
 description = "Local Python PoC for macro/market data ingestion, normalization, storage and reporting."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,3 +38,15 @@ packages = ["src/macrolens_poc"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = []
+
+[tool.black]
+line-length = 110
+target-version = ["py311"]

@@ -51,9 +51,14 @@ def load_settings(config_path: Optional[Path]) -> Settings:
       - This function only validates presence/types, not timezone existence.
         Timezone validation will be added when we introduce timezone-aware
         conversions in later milestones.
+
+      - We intentionally only load the project's local `.env` file.
+        This avoids accidentally inheriting unrelated `.env` files from parent
+        directories (e.g. a user home directory), which would make runs/tests
+        non-deterministic.
     """
 
-    load_dotenv(override=False)
+    load_dotenv(dotenv_path=Path(".env"), override=False)
 
     # start from defaults via pydantic
     base = Settings()

@@ -114,17 +114,22 @@ def _persist_matrix_status(
     run_id: str,
     data_dir: Path,
     results: list[SeriesRunResult],
+    as_of: Optional[datetime] = None,
 ) -> dict:
     matrix_status_entries_updated = 0
     matrix_status_persisted = False
     matrix_status_path = default_matrix_status_path(data_dir)
+
+    run_at = as_of if as_of else datetime.now(timezone.utc)
+    if run_at.tzinfo is None:
+        run_at = run_at.replace(tzinfo=timezone.utc)
 
     try:
         existing_status = load_matrix_status(matrix_status_path)
         merge_result = merge_matrix_status(
             existing=existing_status,
             run_results=results,
-            run_at_utc=datetime.now(timezone.utc),
+            run_at_utc=run_at,
         )
         save_matrix_status(matrix_status_path, merge_result.merged)
         matrix_status_entries_updated = merge_result.updated_entries
@@ -160,12 +165,14 @@ def _persist_matrix_status(
 def run_all(
     ctx: typer.Context,
     lookback_days: int = typer.Option(3650, "--lookback-days", help="How many days to backfill per series"),
+    as_of: Optional[datetime] = typer.Option(None, "--as-of", help="Reference date (YYYY-MM-DD)"),
 ) -> None:
     """Run ingestion for all enabled series."""
 
     settings: Settings = ctx.obj["settings"]
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
+    as_of_date = as_of.date() if as_of else None
 
     logger.log(
         {
@@ -176,6 +183,7 @@ def run_all(
             "report_tz": settings.report_tz,
             "sources_matrix_path": str(settings.sources_matrix_path),
             "lookback_days": lookback_days,
+            "as_of_date": as_of_date.isoformat() if as_of_date else None,
         }
     )
 
@@ -197,7 +205,9 @@ def run_all(
     results: list[SeriesRunResult] = []
 
     for spec in enabled:
-        result = run_series(settings=settings, spec=spec, lookback_days=lookback_days)
+        result = run_series(
+            settings=settings, spec=spec, lookback_days=lookback_days, as_of_date=as_of_date
+        )
         results.append(result)
         status_counts[result.status] = status_counts.get(result.status, 0) + 1
         total_new_points += result.new_points
@@ -210,6 +220,7 @@ def run_all(
         run_id=run_ctx.run_id,
         data_dir=settings.paths.data_dir,
         results=results,
+        as_of=as_of,
     )
 
     summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
@@ -223,12 +234,14 @@ def run_one(
     ctx: typer.Context,
     series_id: str = typer.Option(..., "--id", help="Internal series id"),
     lookback_days: int = typer.Option(3650, "--lookback-days", help="How many days to backfill"),
+    as_of: Optional[datetime] = typer.Option(None, "--as-of", help="Reference date (YYYY-MM-DD)"),
 ) -> None:
     """Run ingestion for a single series id."""
 
     settings: Settings = ctx.obj["settings"]
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
+    as_of_date = as_of.date() if as_of else None
 
     logger.log(
         {
@@ -240,6 +253,7 @@ def run_one(
             "report_tz": settings.report_tz,
             "sources_matrix_path": str(settings.sources_matrix_path),
             "lookback_days": lookback_days,
+            "as_of_date": as_of_date.isoformat() if as_of_date else None,
         }
     )
 
@@ -278,7 +292,9 @@ def run_one(
         }
     )
 
-    result = run_series(settings=settings, spec=spec, lookback_days=lookback_days)
+    result = run_series(
+        settings=settings, spec=spec, lookback_days=lookback_days, as_of_date=as_of_date
+    )
     _record_series_metadata(settings, spec, result)
     _log_series_run(logger, run_id=run_ctx.run_id, result=result)
 
@@ -287,6 +303,7 @@ def run_one(
         run_id=run_ctx.run_id,
         data_dir=settings.paths.data_dir,
         results=[result],
+        as_of=as_of,
     )
 
     status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
@@ -299,12 +316,19 @@ def run_one(
 
 
 @app.command()
-def report(ctx: typer.Context) -> None:
+def report(
+    ctx: typer.Context,
+    as_of: Optional[datetime] = typer.Option(None, "--as-of", help="Reference date (YYYY-MM-DD)"),
+) -> None:
     """Generate Report v1 (Markdown + JSON) from stored series."""
 
     settings: Settings = ctx.obj["settings"]
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
+
+    now_utc = as_of if as_of else datetime.now(timezone.utc)
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=timezone.utc)
 
     logger.log(
         {
@@ -314,10 +338,11 @@ def report(ctx: typer.Context) -> None:
             "data_tz": settings.data_tz,
             "report_tz": settings.report_tz,
             "sources_matrix_path": str(settings.sources_matrix_path),
+            "as_of": now_utc.isoformat(),
         }
     )
 
-    result = generate_report_v1(settings=settings, now_utc=datetime.now(timezone.utc))
+    result = generate_report_v1(settings=settings, now_utc=now_utc)
 
     logger.log(
         {

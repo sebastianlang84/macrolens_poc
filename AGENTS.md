@@ -24,11 +24,11 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ---
 
-## 2) Projekt-Kontext (Kurz)
+## 2) Projekt-Kontext & Links
 
-- Ziel: lokaler Python-PoC für Makro-/Marktdaten-Ingestion, Normalisierung, Storage und Report-Generierung.
-- Anforderungen/Scope: siehe [`PRD.md`](PRD.md:1).
-- Zusatzdokumentation: Status-Snapshot unter [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1) (aktueller Projektstand, offene Punkte).
+- **Primary Entry Point**: [`README.md`](README.md:1) (Quickstart, Installation, Usage).
+- **Requirements**: [`PRD.md`](PRD.md:1).
+- **Status**: [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1).
 
 ---
 
@@ -109,22 +109,14 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ## 6) Quickstart / Smoke-Checklist (lokal)
 
-Ziel: Reproduzierbarer lokaler Run mit minimalem Risiko. CLI Entry: [`pyproject.toml`](pyproject.toml:25) → `macrolens-poc = "macrolens_poc.cli:app"`; CLI Implementation: [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:26).
+Siehe [`README.md`](README.md:5) für detaillierte Installationsanweisungen.
 
-- venv erstellen & aktivieren (Beispiel):
-  - `python -m venv .venv`
-  - `source .venv/bin/activate`
-- Install (editable):
-  - `python -m pip install -e ".[dev]"`
-- CLI Help (Smoke):
-  - `macrolens-poc --help`
-  - Hinweis: `--config` ist globaler CLI-Parameter (Callback), siehe [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:35).
-- Tests (Unit):
-  - `python -m pytest`
-- Minimal Run (bewusst klein halten):
-  - Config-Basis: [`config/config.example.yaml`](config/config.example.yaml:1)
-  - Beispiel: `macrolens-poc --config config/config.example.yaml run-all --lookback-days 10`
-  - Erwartung: schreibt Artefakte unter [`data/`](data/.gitkeep:1), [`logs/`](logs/.gitkeep:1), [`reports/`](reports/.gitkeep:1) (siehe auch Abschnitt 7).
+**Minimal Smoke-Check vor Commit:**
+
+1.  **Environment**: `source .venv/bin/activate`
+2.  **CLI Help**: `macrolens-poc --help`
+3.  **Tests**: `python -m pytest`
+4.  **Docs**: `README.md`, `CHANGELOG.md` aktuell?
 
 ---
 

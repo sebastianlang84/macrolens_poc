@@ -59,6 +59,7 @@ def run_series(
     settings: Settings,
     spec: SeriesSpec,
     lookback_days: int = 3650,
+    as_of_date: Optional[date] = None,
 ) -> SeriesRunResult:
     """Fetch + normalize + store one series.
 
@@ -68,8 +69,13 @@ def run_series(
     lookback_days is a pragmatic default to avoid full-history fetch for some providers.
     """
 
-    observation_start = date.today() - timedelta(days=lookback_days)
-    run_ts = datetime.now(timezone.utc)
+    ref_date = as_of_date if as_of_date is not None else date.today()
+    observation_start = ref_date - timedelta(days=lookback_days)
+
+    if as_of_date:
+        run_ts = datetime.combine(as_of_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+    else:
+        run_ts = datetime.now(timezone.utc)
 
     if spec.provider == "fred":
         try:
@@ -77,7 +83,7 @@ def run_series(
                 series_id=spec.provider_symbol,
                 api_key=settings.fred_api_key,
                 observation_start=observation_start,
-                observation_end=None,
+                observation_end=ref_date,
             )
         except Exception as exc:
             return SeriesRunResult(
@@ -95,7 +101,7 @@ def run_series(
             fetched = fetch_yahoo_history(
                 symbol=spec.provider_symbol,
                 start=observation_start,
-                end=None,
+                end=ref_date + timedelta(days=1),
                 interval="1d",
             )
         except Exception as exc:
@@ -131,6 +137,8 @@ def run_series(
             new_points=0,
             last_observation_date=None,
             run_at=run_ts,
+            error_type=getattr(fetched, "error_type", None),
+            error_message=getattr(fetched, "error_message", None),
         )
 
     try:

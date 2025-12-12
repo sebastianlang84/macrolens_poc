@@ -15,6 +15,8 @@ class FetchResult:
     status: str  # ok/warn/error/missing
     message: str
     data: Optional[pd.DataFrame]
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 def fetch_yahoo_history(
@@ -40,16 +42,45 @@ def fetch_yahoo_history(
     """
 
     def _download() -> pd.DataFrame:
-        return yf.download(symbol, start=start, end=end, interval=interval, progress=False)
+        return yf.download(
+            symbol,
+            start=start,
+            end=end,
+            interval=interval,
+            progress=False,
+            timeout=float(timeout_s),
+            auto_adjust=False,  # Fix FutureWarning; explicit is better than implicit
+        )
+
+    def _should_retry(exc: Exception) -> bool:
+        # Don't retry on programming errors or invalid arguments
+        if isinstance(exc, (TypeError, ValueError, KeyError)):
+            return False
+        return True
 
     try:
         df = retry_call(
             _download,
             cfg=RetryConfig(max_attempts=max_attempts, base_delay_s=0.5, max_delay_s=8.0, multiplier=2.0),
-            should_retry=lambda exc: True,
+            should_retry=_should_retry,
+        )
+    except TypeError as exc:
+        # Regression: observed in the wild (TODO/PROJECT_STATUS). Treat as non-fatal provider error.
+        return FetchResult(
+            status="error",
+            message=f"yfinance download failed: {type(exc).__name__}: {exc}",
+            data=None,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
         )
     except Exception as exc:  # yfinance can raise various runtime exceptions
-        return FetchResult(status="error", message=f"yfinance download failed: {type(exc).__name__}: {exc}", data=None)
+        return FetchResult(
+            status="error",
+            message=f"yfinance download failed: {type(exc).__name__}: {exc}",
+            data=None,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
 
     if df is None or df.empty:
         return FetchResult(status="warn", message="yfinance returned 0 rows", data=pd.DataFrame(columns=["date", "value"]))

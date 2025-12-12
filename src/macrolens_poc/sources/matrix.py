@@ -66,6 +66,9 @@ def load_sources_matrix(path: Path) -> MatrixLoadResult:
 
     _validate_uniqueness(matrix)
 
+    # Ensure deterministic order by sorting series by ID
+    matrix.series.sort(key=lambda s: s.id)
+
     return MatrixLoadResult(matrix=matrix, path=path)
 
 

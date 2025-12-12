@@ -12,5 +12,15 @@ def test_load_sources_matrix_ok() -> None:
     assert result.path == path
     assert result.matrix.version == 1
     assert len(result.matrix.series) >= 10
-    assert any(s.provider == "fred" for s in result.matrix.series)
-    assert any(s.provider == "yfinance" for s in result.matrix.series)
+
+    # Create a dict for deterministic lookups
+    series_by_id = {s.id: s for s in result.matrix.series}
+
+    # Check specific series to ensure correct loading regardless of order
+    assert "us_cpi" in series_by_id
+    assert series_by_id["us_cpi"].provider == "fred"
+    assert series_by_id["us_cpi"].provider_symbol == "CPIAUCSL"
+
+    assert "sp500" in series_by_id
+    assert series_by_id["sp500"].provider == "yfinance"
+    assert series_by_id["sp500"].provider_symbol == "^GSPC"

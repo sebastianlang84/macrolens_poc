@@ -192,52 +192,7 @@ NFR5: Keine Secrets in Git.
 * Stale-series detection.
 * „Matrix status“ export.
 
-## 12) TODO für RooCode (direkt übernehmbar)
-
-### Epic 1: Repo Setup
-
-* [ ] Python-Projekt initialisieren (pyproject.toml, uv/poetry).
-* [ ] CLI via `typer` oder `argparse`.
-* [ ] Konfig-Handling: `.env` + `config.yaml`.
-* [ ] Structured Logging (jsonlines).
-
-### Epic 2: Data-Source-Matrix
-
-* [ ] `sources_matrix.yaml` Schema definieren.
-* [ ] Loader + Schema-Validation (pydantic).
-* [ ] Status-Felder automatisch pflegen (`last_ok`, `status`).
-
-### Epic 3: Provider Adapter
-
-* [ ] FRED: fetch series by id, support start/end.
-* [ ] Yahoo Finance: fetch EOD close for tickers.
-* [ ] Retry/Timeout/Backoff (tenacity).
-
-### Epic 4: Normalize/Validate
-
-* [ ] Einheitliches Datumsformat (UTC oder Europe/Vienna klar definieren).
-* [ ] Dedupe + sort + gap handling.
-* [ ] Validations: empty, stale, missing.
-
-### Epic 5: Storage
-
-* [ ] Time series pro Serie als Parquet (Partition by series id).
-* [ ] Append/merge logic ohne Duplikate.
-* [ ] Optional: SQLite index für Metadaten.
-
-### Epic 6: Report v1
-
-* [ ] Aggregator: last value + Δ1d/5d/21d.
-* [ ] Risk Flags (simple rules): z. B. VIX↑ + HY spread↑ = Risk-Off.
-* [ ] Output: Markdown + JSON.
-
-### Epic 7: DX (Developer Experience)
-
-* [ ] Makefile/justfile: `run_all`, `run_one`, `report`.
-* [ ] Minimal Tests (pytest) für Matrix-Loader + storage merge.
-* [ ] Beispielkonfig + Dokumentation.
-
-## 13) Open Questions (für später, nicht blocker für PoC)
+## 12) Open Questions (für später, nicht blocker für PoC)
 
 * Offizieller Ersatz für Yahoo (kostenlos/bezahlt) und Prioritäten.
 * Japan/China Daten: welche Reihen sind must-have?

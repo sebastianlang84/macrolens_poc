@@ -85,6 +85,11 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ## 4) Tooling-Regeln (Terminal/Docs)
 
+- **Umgebung zuerst feststellen**: Zu Beginn eines Tasks (und bevor Tool-Commands/Installs vorgeschlagen werden) die lokale Umgebung kurz verifizieren:
+  - Betriebssystem / Shell
+  - Laufzeitumgebung (z. B. `python` vs `python3`, Version)
+  - Paketmanager/Tools (z. B. `pip`, `pytest`, `poetry`, `uv`, `conda`) und ob sie verfügbar sind
+  - ggf. aktive Terminals/Running Processes (Dev-Server, Jobs)
 - **Terminal-Kommandos**: Immer kurz erklären, was der Befehl macht und warum er nötig ist.
 - **Context7 nutzen**: Bei Bibliotheks-/Framework-Fragen (APIs, Signaturen, Verhalten) zuerst Context7 verwenden, statt zu raten.
 - Externe Web-Recherche nur, wenn Repo/Docs nicht ausreichen oder das Thema zeitkritisch ist.
@@ -98,3 +103,90 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 3. Implementieren in kleinen Diffs.
 4. Minimaler Smoke-Check (z. B. Import/CLI Help/Unit-Test) sofern möglich.
 5. Doku aktualisieren (README/Changelog) nur wenn es echten Nutzwert hat.
+
+---
+
+## 6) Quickstart / Smoke-Checklist (lokal)
+
+Ziel: Reproduzierbarer lokaler Run mit minimalem Risiko. CLI Entry: [`pyproject.toml`](pyproject.toml:25) → `macrolens-poc = "macrolens_poc.cli:app"`; CLI Implementation: [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:26).
+
+- venv erstellen & aktivieren (Beispiel):
+  - `python -m venv .venv`
+  - `source .venv/bin/activate`
+- Install (editable):
+  - `python -m pip install -e ".[dev]"`
+- CLI Help (Smoke):
+  - `macrolens-poc --help`
+  - Hinweis: `--config` ist globaler CLI-Parameter (Callback), siehe [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:35).
+- Tests (Unit):
+  - `python -m pytest`
+- Minimal Run (bewusst klein halten):
+  - Config-Basis: [`config/config.example.yaml`](config/config.example.yaml:1)
+  - Beispiel: `macrolens-poc --config config/config.example.yaml run-all --lookback-days 10`
+  - Erwartung: schreibt Artefakte unter [`data/`](data/.gitkeep:1), [`logs/`](logs/.gitkeep:1), [`reports/`](reports/.gitkeep:1) (siehe auch Abschnitt 7).
+
+---
+
+## 7) Artefakte & Repo-Sauberkeit
+
+- Laufzeit-Artefakte (Outputs) werden **nicht** committet.
+- Standard-Orte (konfigurierbar via [`config/config.example.yaml`](config/config.example.yaml:16)):
+  - Daten: [`data/`](data/.gitkeep:1) (z. B. `data/series/*.parquet`)
+  - Logs: [`logs/`](logs/.gitkeep:1) (z. B. `logs/run-YYYYMMDD.jsonl`)
+  - Reports: [`reports/`](reports/.gitkeep:1) (z. B. `reports/*.md`, `reports/*.json`)
+- Wenn neue Artefakt-Typen entstehen: Pfad/Pattern dokumentieren und `.gitignore` aktualisieren (keine stillen Overwrites).
+
+---
+
+## 8) Observability Contract (JSONL)
+
+Logging ist strukturiert als **JSONL**: eine JSON-Map pro Zeile (Writer: `JsonlLogger` in [`src/macrolens_poc/logging_utils.py`](src/macrolens_poc/logging_utils.py:26)).
+
+Minimalfelder (jede Zeile):
+- `event` (string, Event-Name)
+- `run_id` (string, korreliert alle Events eines Runs)
+
+Erwartete Kern-Events (aktuell in [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:55)):
+- `command_start`: mindestens `command`, optional Parameter (z. B. `lookback_days`, `sources_matrix_path`)
+- `series_run`: mindestens `series_id`, `provider`, `status`, `message`, `new_points`, optional `stored_path`, `error_type`, `error_message`, `revision_overwrites_*`
+- `run_summary`: mindestens `started_at`, `ended_at`, `duration_s`, `status_counts` (siehe `run_summary_event()` in [`src/macrolens_poc/logging_utils.py`](src/macrolens_poc/logging_utils.py:42))
+
+(Optional) Breaking Change Klarstellung:
+- Änderungen am JSONL-Schema gelten als Breaking Change, wenn Keys entfernt/umbenannt werden oder sich Datentypen/Bedeutung ändern (z. B. `status_counts` von Map → Liste). Reine **Hinzufügungen** neuer optionaler Keys sind nicht-breaking.
+
+---
+
+## 9) Tests: Netzwerkzugriff (Unit vs. Integration)
+
+- Unit-Tests (Default, `python -m pytest`) dürfen **keinen Netzwerkzugriff** benötigen. Provider-Aufrufe werden via Monkeypatch/Stubs isoliert (Beispiel: [`tests/test_m2_provider_robustness.py`](tests/test_m2_provider_robustness.py:12)).
+- Integration-Tests (opt-in) dürfen Netzwerkzugriff nutzen, müssen aber:
+  - klar markiert sein (z. B. pytest marker `integration`)
+  - nur bei explizitem Opt-in laufen (z. B. Environment-Flag wie `MACROLENS_INTEGRATION=1`)
+  - Secrets über `.env`/Environment beziehen (siehe Abschnitt 3.1 und [`config/config.example.yaml`](config/config.example.yaml:12))
+
+---
+
+## 10) Provider- & Normalization-Contract
+
+Provider-Contract (Output in `FetchResult.data`):
+- DataFrame mit Spalten **`date`** und **`value`** (1D Time Series), siehe Provider-Docs/Code:
+  - FRED: [`src/macrolens_poc/sources/fred.py`](src/macrolens_poc/sources/fred.py:26)
+  - Yahoo/yfinance: [`src/macrolens_poc/sources/yahoo.py`](src/macrolens_poc/sources/yahoo.py:20)
+- `date` ist UTC-normalisiert (timezone-aware), `value` ist numerisch (float; NaNs erlaubt für „missing“ Werte).
+- Status ist einer aus `ok|warn|error|missing`.
+
+Normalization-Contract (Pipeline):
+- `_normalize_timeseries()` erzwingt Schema `(date,value)`, dedupliziert auf `date` (keep last) und sortiert (siehe [`src/macrolens_poc/pipeline/run_series.py`](src/macrolens_poc/pipeline/run_series.py:31)).
+- Storage-Contract (Parquet): `date,value` Spalten; Merge ohne Duplikate; bei Revisionen überschreibt Incoming und loggt Overwrite-Sample (siehe [`src/macrolens_poc/storage/parquet_store.py`](src/macrolens_poc/storage/parquet_store.py:70)).
+
+---
+
+## 11) Minimal Definition of Done (DoD)
+
+- [ ] Änderung ist klein & nachvollziehbar (kein „Mega-Diff“)
+- [ ] Repo-first eingehalten: relevante Dateien gelesen/gelinkt (z. B. [`PRD.md`](PRD.md:1))
+- [ ] Smoke: `macrolens-poc --help` funktioniert (Entry: [`pyproject.toml`](pyproject.toml:25))
+- [ ] Tests: `python -m pytest` grün
+- [ ] Keine Secrets/Outputs committet (siehe Abschnitt 3.1 und 7)
+- [ ] Logging/Robustheit nicht verschlechtert; JSONL Contract beachtet (Abschnitt 8)
+- [ ] Doku aktualisiert, falls Nutzer-/DX-Wert entsteht (mind. [`README.md`](README.md:1), [`CHANGELOG.md`](CHANGELOG.md:1), [`TODO.md`](TODO.md:1))

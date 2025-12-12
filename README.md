@@ -56,6 +56,9 @@ python -m macrolens_poc.cli run-one --id us_cpi --lookback-days 3650
 
 # alle enabled Serien
 python -m macrolens_poc.cli run-all --lookback-days 3650
+
+# Report v1 aus gespeicherten Serien generieren
+python -m macrolens_poc.cli report
 ```
 
 Nächste Arbeitspakete (M3+) siehe [`TODO.md`](TODO.md:1) und Roadmap / Anforderungen in [`PRD.md`](PRD.md:195).

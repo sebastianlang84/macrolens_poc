@@ -4,23 +4,23 @@
 
 - [x] Data-Source-Matrix: Schema + Datei definieren (YAML/CSV/JSON) gem. [`PRD.md`](PRD.md:65)
 - [x] Matrix-Loader + Schema-Validation (z. B. pydantic)
-- [ ] Matrix-Statusfelder automatisch pflegen (`last_ok`, `status`)
+- [x] Matrix-Statusfelder automatisch pflegen (`last_ok`, `status`)
 - [x] Provider-Adapter: FRED (Series by id, start/end)
 - [x] Provider-Adapter: Yahoo Finance (EOD Close für Ticker)
-- [ ] Provider-Robustheit: Timeout/Retry/Backoff (Provider-Fehler dürfen Run nicht crashen)
+- [x] Provider-Robustheit: Timeout/Retry/Backoff (Provider-Fehler dürfen Run nicht crashen)
 - [x] Normalize/Validate: einheitliches Datums-/Zeitzonen-Regime festlegen und konsequent umsetzen
 - [x] Normalize: Dedupe + sort + gap handling (Daily Index, NaNs)
 - [x] Validate: empty / stale / missing (Status `ok/warn/error/missing`)
 - [x] Storage: Time series pro Serie (Parquet bevorzugt), Append/Merge ohne Duplikate
-- [ ] Revisionsdaten (z. B. FRED): Overwrite-Policy + Logging für rückwirkende Änderungen
+- [x] Revisionsdaten (z. B. FRED): Overwrite-Policy + Logging für rückwirkende Änderungen
 - [x] CLI: Daily Run (alle `enabled=true`) + On-Demand Run (Liste von `id`s)
 - [x] Run Summary: ok/warn/error/missing + Laufzeit + „0 neue Punkte“ bei No-Op Run
 
 ## Next (M3) — Report v1
 
-- [ ] Aggregator: letzter Wert + Δ1d/Δ5d/Δ21d
-- [ ] Simple Risk Flags (Heuristiken) gem. [`PRD.md`](PRD.md:93)
-- [ ] Export: Markdown + JSON (z. B. `reports/report-YYYYMMDD.md` + `.json`)
+- [x] Aggregator: letzter Wert + Δ1d/Δ5d/Δ21d
+- [x] Simple Risk Flags (Heuristiken) gem. [`PRD.md`](PRD.md:93)
+- [x] Export: Markdown + JSON (z. B. `reports/report-YYYYMMDD.md` + `.json`)
 
 ## Later — Monitoring, DX, Open Questions
 

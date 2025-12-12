@@ -1,0 +1,5 @@
+# Reduce merge conflicts in frequently edited text files
+CHANGELOG.md merge=union
+TODO.md merge=union
+PROJECT_STATUS.md merge=union
+README.md merge=union

@@ -27,7 +27,7 @@ class SeriesSpec(BaseModel):
 
     # system-maintained (optional in static matrix file)
     last_ok: Optional[str] = Field(default=None)
-    status: Optional[Literal["ok", "warn", "error", "missing"]] = Field(default=None)
+    status: Optional[Literal["ok", "warn", "error", "missing", "stale"]] = Field(default=None)
 
 
 class SourcesMatrix(BaseModel):

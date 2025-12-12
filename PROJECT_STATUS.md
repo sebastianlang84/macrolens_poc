@@ -7,9 +7,9 @@
 - Configuration relies on `.env`/YAML for timezones and keys; storage/paths are centralized in `Settings`.
 
 ## Observations
-- Reporting command generates Markdown/JSON artifacts with last values and Δ windows, but risk flags remain TODO.
+- Reporting command generates Markdown/JSON artifacts with last values, Δ windows, and matrix status exports (inkl. Alters-basierter `stale`-Flag), but risk flags remain TODO.
 - Provider robustness gaps remain: no timeout/retry/backoff and no revision-overwrite policy for sources with backfilled changes.
-- Matrix metadata still lacks automatic status fields like `last_ok`/`status`.
+- Matrix metadata now includes automatische Statusfelder (`status`, `stale`, `last_date`), aber `last_ok`-Tracking und Fehler-Metadaten fehlen weiterhin.
 - Storage path layout is fixed to `data/series/{id}.parquet` without partitioning or metadata index.
 
 ## Suggested Next Steps

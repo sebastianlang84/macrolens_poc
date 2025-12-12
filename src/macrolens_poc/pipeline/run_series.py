@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -11,6 +12,7 @@ from macrolens_poc.config import Settings
 from macrolens_poc.sources.matrix import SeriesSpec
 from macrolens_poc.sources.fred import fetch_fred_series_observations
 from macrolens_poc.sources.yahoo import fetch_yahoo_history
+from macrolens_poc.pipeline.status import DEFAULT_STALE_THRESHOLD_DAYS, compute_data_age_days, is_stale
 from macrolens_poc.storage.parquet_store import StoreResult, store_series
 
 
@@ -42,6 +44,36 @@ def _normalize_timeseries(df: pd.DataFrame) -> pd.DataFrame:
     out = out.sort_values("date")
 
     return out[["date", "value"]]
+
+
+def _evaluate_staleness(
+    *,
+    status: str,
+    message: str,
+    store_result: StoreResult,
+    settings: Settings,
+) -> tuple[str, str]:
+    """Return updated status and message based on staleness.
+
+    The helper keeps the main `run_series` flow smaller to reduce future merge conflicts
+    around post-store status handling.
+    """
+
+    if status != "ok" or store_result.last_date is None:
+        return status, message
+
+    now = datetime.now(ZoneInfo(settings.data_tz))
+    if is_stale(last_date=store_result.last_date, now=now, threshold_days=DEFAULT_STALE_THRESHOLD_DAYS):
+        age_days = compute_data_age_days(last_date=store_result.last_date, now=now)
+        return (
+            "stale",
+            (
+                f"stale: last point {store_result.last_date.date()} age {age_days}d "
+                f"(threshold {DEFAULT_STALE_THRESHOLD_DAYS}d)"
+            ),
+        )
+
+    return status, message
 
 
 def run_series(
@@ -133,11 +165,18 @@ def run_series(
             new_points=0,
         )
 
+    status, message = _evaluate_staleness(
+        status=fetched.status,
+        message=fetched.message,
+        store_result=store_result,
+        settings=settings,
+    )
+
     return SeriesRunResult(
         series_id=spec.id,
         provider=spec.provider,
-        status=fetched.status,
-        message="ok",
+        status=status,
+        message=message,
         stored_path=store_result.path,
         new_points=store_result.new_points,
     )

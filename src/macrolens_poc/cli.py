@@ -16,6 +16,7 @@ from macrolens_poc.pipeline import run_series
 from macrolens_poc.report.generate import (
     DEFAULT_DELTA_WINDOWS,
     generate_series_report,
+    write_status_report,
     write_report_artifacts,
 )
 from macrolens_poc.sources import load_sources_matrix
@@ -85,7 +86,7 @@ def run_all(
         }
     )
 
-    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
+    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0, "stale": 0}
     total_new_points = 0
 
     for spec in enabled:
@@ -186,7 +187,7 @@ def run_one(
         }
     )
 
-    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
+    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0, "stale": 0}
     status_counts[result.status] = 1
 
     summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
@@ -220,6 +221,7 @@ def report(ctx: typer.Context) -> None:
         series_report = generate_series_report(
             spec=spec,
             data_dir=settings.paths.data_dir,
+            data_tz=settings.data_tz,
             windows=DEFAULT_DELTA_WINDOWS,
         )
         status_counts[series_report.status] = status_counts.get(series_report.status, 0) + 1
@@ -248,12 +250,21 @@ def report(ctx: typer.Context) -> None:
         windows=DEFAULT_DELTA_WINDOWS,
     )
 
+    status_artifacts = write_status_report(
+        reports=reports,
+        reports_dir=settings.paths.reports_dir,
+        report_tz=settings.report_tz,
+        run_ctx=run_ctx,
+    )
+
     logger.log(
         {
             "event": "report_written",
             "run_id": run_ctx.run_id,
             "markdown_path": str(artifacts["markdown"]),
             "json_path": str(artifacts["json"]),
+            "status_json_path": str(status_artifacts["json"]),
+            "status_csv_path": str(status_artifacts["csv"]),
             "series_total": len(reports),
         }
     )

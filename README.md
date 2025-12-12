@@ -62,3 +62,7 @@ python -m macrolens_poc.cli report
 ```
 
 Nächste Arbeitspakete (M3+) siehe [`TODO.md`](TODO.md:1) und Roadmap / Anforderungen in [`PRD.md`](PRD.md:195).
+
+## Merge-Konflikte in Docs vermeiden
+
+Für häufig geänderte Textdateien ist `merge=union` vordefiniert (siehe [`.gitattributes`](.gitattributes:1)), damit unabhängige Änderungen an Changelog/TODO/Status/README automatisch zusammengeführt werden.

@@ -13,6 +13,7 @@ class StoreResult:
     rows_before: int
     rows_after: int
     new_points: int
+    last_date: Optional[pd.Timestamp]
 
 
 def load_series(path: Path) -> Optional[pd.DataFrame]:
@@ -97,9 +98,12 @@ def store_series(path: Path, incoming: pd.DataFrame) -> StoreResult:
 
     merged.to_parquet(path, index=False)
 
+    last_date: Optional[pd.Timestamp] = None if merged.empty else pd.to_datetime(merged["date"], utc=True).max()
+
     return StoreResult(
         path=path,
         rows_before=rows_before,
         rows_after=rows_after,
         new_points=new_points,
+        last_date=last_date,
     )

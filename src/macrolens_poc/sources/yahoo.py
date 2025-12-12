@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import time
 from typing import Optional
 
 import pandas as pd
+import requests
 import yfinance as yf
 
 
@@ -21,6 +23,9 @@ def fetch_yahoo_history(
     start: Optional[date] = None,
     end: Optional[date] = None,
     interval: str = "1d",
+    timeout_s: float = 10.0,
+    max_attempts: int = 3,
+    backoff_factor: float = 1.5,
 ) -> FetchResult:
     """Fetch historical daily prices from Yahoo Finance via yfinance.
 
@@ -33,12 +38,35 @@ def fetch_yahoo_history(
     Notes:
     - yfinance returns index as DatetimeIndex.
     - We normalize to UTC and pick Close.
+    - Retry/backoff (max_attempts, backoff_factor) is applied to network errors/timeouts.
     """
 
-    try:
-        df = yf.download(symbol, start=start, end=end, interval=interval, progress=False)
-    except Exception as exc:  # yfinance can raise various runtime exceptions
-        return FetchResult(status="error", message=f"yfinance download failed: {exc}", data=None)
+    df = None
+    last_error: Optional[str] = None
+    attempts = max(1, max_attempts)
+
+    for attempt in range(1, attempts + 1):
+        try:
+            df = yf.download(
+                symbol,
+                start=start,
+                end=end,
+                interval=interval,
+                progress=False,
+                timeout=timeout_s,
+            )
+        except requests.Timeout as exc:
+            last_error = f"code=timeout; detail={exc}"
+        except Exception as exc:  # yfinance can raise various runtime exceptions
+            last_error = f"code=download_failed; detail={exc}"
+        else:
+            break
+
+        if attempt < attempts:
+            sleep_s = backoff_factor ** (attempt - 1)
+            time.sleep(sleep_s)
+        else:
+            return FetchResult(status="error", message=last_error or "code=unknown_error", data=None)
 
     if df is None or df.empty:
         return FetchResult(status="warn", message="yfinance returned 0 rows", data=pd.DataFrame(columns=["date", "value"]))

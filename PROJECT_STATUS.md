@@ -7,7 +7,7 @@
 - Configuration relies on `.env`/YAML for timezones and keys; storage/paths are centralized in `Settings`.
 
 ## Observations
-- Reporting command is a stub: `cli report` logs only a start/summary event and does not generate artifacts.
+- Reporting command generates Markdown/JSON artifacts with last values and Δ windows, but risk flags remain TODO.
 - Provider robustness gaps remain: no timeout/retry/backoff and no revision-overwrite policy for sources with backfilled changes.
 - Matrix metadata still lacks automatic status fields like `last_ok`/`status`.
 - Storage path layout is fixed to `data/series/{id}.parquet` without partitioning or metadata index.
@@ -15,6 +15,6 @@
 ## Suggested Next Steps
 - Implement basic retry/backoff around provider fetches and capture HTTP/provider error metadata in logs.
 - Extend matrix loader to track `last_ok` and derive series health from run outcomes; export a matrix status view.
-- Flesh out `report` command with aggregator logic (last value plus Δ windows) and Markdown/JSON outputs under `reports/`.
+- Add risk-flag heuristics to the report output and include contextual metadata (category/units).
 - Add revision-aware storage policy for datasets with historical restatements to prevent silent overwrites.
 - Introduce a lightweight index (e.g., SQLite or manifest) to query available series and their update timestamps.

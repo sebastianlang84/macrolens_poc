@@ -18,9 +18,9 @@
 
 ## Next (M3) — Report v1
 
-- [ ] Aggregator: letzter Wert + Δ1d/Δ5d/Δ21d
+- [x] Aggregator: letzter Wert + Δ1d/Δ5d/Δ21d
 - [ ] Simple Risk Flags (Heuristiken) gem. [`PRD.md`](PRD.md:93)
-- [ ] Export: Markdown + JSON (z. B. `reports/report-YYYYMMDD.md` + `.json`)
+- [x] Export: Markdown + JSON (z. B. `reports/report-YYYYMMDD.md` + `.json`)
 
 ## Later — Monitoring, DX, Open Questions
 

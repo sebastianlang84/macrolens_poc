@@ -13,6 +13,11 @@ from macrolens_poc.logging_utils import (
     run_summary_event,
 )
 from macrolens_poc.pipeline import run_series
+from macrolens_poc.report.generate import (
+    DEFAULT_DELTA_WINDOWS,
+    generate_series_report,
+    write_report_artifacts,
+)
 from macrolens_poc.sources import load_sources_matrix
 
 app = typer.Typer(add_completion=False, help="macrolens_poc CLI (Milestone M0 skeleton)")
@@ -191,7 +196,7 @@ def run_one(
 
 @app.command()
 def report(ctx: typer.Context) -> None:
-    """Stub: later generate daily report."""
+    """Generate Markdown/JSON report from stored series."""
 
     settings: Settings = ctx.obj["settings"]
     run_ctx = new_run_context()
@@ -207,9 +212,53 @@ def report(ctx: typer.Context) -> None:
         }
     )
 
-    # Milestone M0: no report generation yet.
+    matrix_result = load_sources_matrix(settings.sources_matrix_path)
+    reports = []
+    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
 
-    logger.log(run_summary_event(ctx=run_ctx, status_counts={"ok": 0, "warn": 0, "error": 0, "missing": 0}))
+    for spec in matrix_result.matrix.series:
+        series_report = generate_series_report(
+            spec=spec,
+            data_dir=settings.paths.data_dir,
+            windows=DEFAULT_DELTA_WINDOWS,
+        )
+        status_counts[series_report.status] = status_counts.get(series_report.status, 0) + 1
+        reports.append(series_report)
+
+        logger.log(
+            {
+                "event": "series_report",
+                "run_id": run_ctx.run_id,
+                "series_id": series_report.series_id,
+                "provider": series_report.provider,
+                "status": series_report.status,
+                "message": series_report.message,
+                "last_date": series_report.last_date.isoformat() if series_report.last_date is not None else None,
+                "last_value": series_report.last_value,
+                "deltas": series_report.deltas,
+                "path": str(series_report.path),
+            }
+        )
+
+    artifacts = write_report_artifacts(
+        reports=reports,
+        reports_dir=settings.paths.reports_dir,
+        report_tz=settings.report_tz,
+        run_ctx=run_ctx,
+        windows=DEFAULT_DELTA_WINDOWS,
+    )
+
+    logger.log(
+        {
+            "event": "report_written",
+            "run_id": run_ctx.run_id,
+            "markdown_path": str(artifacts["markdown"]),
+            "json_path": str(artifacts["json"]),
+            "series_total": len(reports),
+        }
+    )
+
+    logger.log(run_summary_event(ctx=run_ctx, status_counts=status_counts))
 
 
 if __name__ == "__main__":

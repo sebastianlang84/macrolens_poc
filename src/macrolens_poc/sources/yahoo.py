@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-import time
 from typing import Optional
 
 import pandas as pd
-import requests
 import yfinance as yf
 
 from macrolens_poc.retry_utils import RetryConfig, retry_call

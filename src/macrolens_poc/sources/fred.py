@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-import time
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -111,7 +110,11 @@ def fetch_fred_series_observations(
         return FetchResult(status="error", message="FRED response missing observations list", data=None)
 
     if not observations:
-        return FetchResult(status="warn", message="FRED returned 0 observations", data=pd.DataFrame(columns=["date", "value"]))
+        return FetchResult(
+            status="warn",
+            message="FRED returned 0 observations",
+            data=pd.DataFrame(columns=["date", "value"]),
+        )
 
     rows = []
     for o in observations:

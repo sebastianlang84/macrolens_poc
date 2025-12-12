@@ -8,8 +8,8 @@ from typing import Optional
 import pandas as pd
 
 from macrolens_poc.config import Settings
-from macrolens_poc.sources.matrix import SeriesSpec
 from macrolens_poc.sources.fred import fetch_fred_series_observations
+from macrolens_poc.sources.matrix import SeriesSpec
 from macrolens_poc.sources.yahoo import fetch_yahoo_history
 from macrolens_poc.storage.parquet_store import StoreResult, load_series, store_series
 
@@ -22,6 +22,12 @@ class SeriesRunResult:
     message: str
     stored_path: Optional[Path]
     new_points: int
+    revision_overwrites_count: int = 0
+    revision_overwrites_sample: Optional[list[dict]] = None
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
+
+    # Optional extras (non-breaking additions)
     revision_overwrites_count: int = 0
     revision_overwrites_sample: Optional[list[dict]] = None
     error_type: Optional[str] = None
@@ -137,6 +143,8 @@ def run_series(
             message=f"normalize failed: {exc}",
             stored_path=None,
             new_points=0,
+            last_observation_date=None,
+            run_at=run_ts,
             error_type=type(exc).__name__,
             error_message=str(exc),
         )

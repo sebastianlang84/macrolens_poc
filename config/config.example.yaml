@@ -1,0 +1,19 @@
+# Example configuration (copy to config/config.yaml for local use)
+# Timezone conventions:
+# - data_tz: canonical timezone for stored timestamps
+# - report_tz: presentation timezone for reports
+
+data_tz: "UTC"
+report_tz: "Europe/Vienna"
+
+# Path to the data-source-matrix YAML (single source of truth for series)
+sources_matrix_path: "config/sources_matrix.yaml"
+
+# Provider keys
+# - keep secrets out of this YAML; prefer .env (see .env.example)
+# - FRED_API_KEY is read from the environment and mapped to Settings.fred_api_key
+
+paths:
+  data_dir: "data"
+  logs_dir: "logs"
+  reports_dir: "reports"

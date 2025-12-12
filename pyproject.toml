@@ -1,0 +1,38 @@
+[project]
+name = "macrolens-poc"
+version = "0.0.0"
+description = "Local Python PoC for macro/market data ingestion, normalization, storage and reporting."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "typer>=0.12.3",
+  "PyYAML>=6.0.1",
+  "pydantic>=2.7.0",
+  "python-dotenv>=1.0.1",
+
+  # M1/M2: providers + pipeline + storage
+  "requests>=2.32.0",
+  "pandas>=2.2.0",
+  "pyarrow>=16.0.0",
+  "yfinance>=0.2.40",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+]
+
+[project.scripts]
+macrolens-poc = "macrolens_poc.cli:app"
+
+[build-system]
+requires = ["hatchling>=1.24.2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/macrolens_poc"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

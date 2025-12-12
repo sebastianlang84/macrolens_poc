@@ -4,7 +4,7 @@
 
 - [x] Data-Source-Matrix: Schema + Datei definieren (YAML/CSV/JSON) gem. [`PRD.md`](PRD.md:65)
 - [x] Matrix-Loader + Schema-Validation (z. B. pydantic)
-- [ ] Matrix-Statusfelder automatisch pflegen (`last_ok`, `status`)
+- [x] Matrix-Statusfelder automatisch pflegen (`last_ok`, `status`, „stale“ via Altersberechnung)
 - [x] Provider-Adapter: FRED (Series by id, start/end)
 - [x] Provider-Adapter: Yahoo Finance (EOD Close für Ticker)
 - [ ] Provider-Robustheit: Timeout/Retry/Backoff (Provider-Fehler dürfen Run nicht crashen)

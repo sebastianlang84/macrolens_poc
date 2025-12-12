@@ -31,6 +31,8 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 ### Changed
 
 - CLI `run-all`/`run-one` führen jetzt echte Runs aus und loggen `series_run` + `run_summary` inkl. `total_new_points` (siehe [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:1)).
+- Provider-Fetcher robuster: FRED- und Yahoo-Schnittstellen nutzen jetzt Timeout + Retry/Backoff und liefern strukturierte Fehlermeldungen statt ungefangener Exceptions.
+- Neue Unit-Tests für Provider-Retry/Timeout-Pfade.
 
 ### Fixed
 

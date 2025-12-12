@@ -37,6 +37,8 @@ def test_merge_matrix_status_deterministic_and_keeps_unaffected() -> None:
             message="empty after normalize",
             stored_path=None,
             new_points=0,
+            last_observation_date=None,
+            run_at=run_at,
             error_type=None,
             error_message=None,
         )
@@ -87,6 +89,8 @@ def test_merge_matrix_status_updates_last_ok_only_on_ok() -> None:
             message="ok",
             stored_path=None,
             new_points=1,
+            last_observation_date=None,
+            run_at=run_at,
             error_type=None,
             error_message=None,
         )

@@ -17,8 +17,13 @@ class _DummyResponse:
     def json(self):  # type: ignore[override]
         return self._payload
 
+    def raise_for_status(self) -> None:  # mimic requests.Response
+        return None
+
 
 def test_fetch_fred_retries_on_timeout(monkeypatch) -> None:
+    # Keep unit tests fast/deterministic: disable actual sleeping in retry backoff.
+    monkeypatch.setattr(fred.retry_call.__globals__["time"], "sleep", lambda *_: None)
     payload = {"observations": [{"date": "2020-01-01", "value": "1.0"}]}
     calls: list[int] = []
 
@@ -29,7 +34,6 @@ def test_fetch_fred_retries_on_timeout(monkeypatch) -> None:
         return _DummyResponse(payload=payload)
 
     monkeypatch.setattr(fred.requests, "get", _fake_get)
-    monkeypatch.setattr(fred.time, "sleep", lambda *_: None)
 
     result = fred.fetch_fred_series_observations(
         series_id="SERIES",
@@ -38,7 +42,6 @@ def test_fetch_fred_retries_on_timeout(monkeypatch) -> None:
         observation_end=None,
         timeout_s=0.1,
         max_attempts=2,
-        backoff_factor=0.0,
     )
 
     assert len(calls) == 2
@@ -47,11 +50,12 @@ def test_fetch_fred_retries_on_timeout(monkeypatch) -> None:
 
 
 def test_fetch_fred_timeout_exhausted(monkeypatch) -> None:
+    monkeypatch.setattr(fred.retry_call.__globals__["time"], "sleep", lambda *_: None)
+
     def _always_timeout(*_, **__):
         raise requests.Timeout("hard timeout")
 
     monkeypatch.setattr(fred.requests, "get", _always_timeout)
-    monkeypatch.setattr(fred.time, "sleep", lambda *_: None)
 
     result = fred.fetch_fred_series_observations(
         series_id="SERIES",
@@ -60,14 +64,14 @@ def test_fetch_fred_timeout_exhausted(monkeypatch) -> None:
         observation_end=None,
         timeout_s=0.1,
         max_attempts=2,
-        backoff_factor=0.0,
     )
 
     assert result.status == "error"
-    assert "code=timeout" in result.message or "request_exception" in result.message
+    assert "Timeout" in result.message or "request failed" in result.message
 
 
 def test_fetch_yahoo_retries_download(monkeypatch) -> None:
+    monkeypatch.setattr(yahoo.retry_call.__globals__["time"], "sleep", lambda *_: None)
     calls: list[int] = []
 
     def _fake_download(*_, **__):
@@ -77,7 +81,6 @@ def test_fetch_yahoo_retries_download(monkeypatch) -> None:
         return pd.DataFrame({"Close": [1.0]}, index=pd.date_range("2020-01-01", periods=1))
 
     monkeypatch.setattr(yahoo.yf, "download", _fake_download)
-    monkeypatch.setattr(yahoo.time, "sleep", lambda *_: None)
 
     result = yahoo.fetch_yahoo_history(
         symbol="AAPL",
@@ -86,7 +89,6 @@ def test_fetch_yahoo_retries_download(monkeypatch) -> None:
         interval="1d",
         timeout_s=0.1,
         max_attempts=2,
-        backoff_factor=0.0,
     )
 
     assert len(calls) == 2
@@ -95,11 +97,12 @@ def test_fetch_yahoo_retries_download(monkeypatch) -> None:
 
 
 def test_fetch_yahoo_timeout_exhausted(monkeypatch) -> None:
+    monkeypatch.setattr(yahoo.retry_call.__globals__["time"], "sleep", lambda *_: None)
+
     def _always_timeout(*_, **__):
         raise requests.Timeout("download timeout")
 
     monkeypatch.setattr(yahoo.yf, "download", _always_timeout)
-    monkeypatch.setattr(yahoo.time, "sleep", lambda *_: None)
 
     result = yahoo.fetch_yahoo_history(
         symbol="AAPL",
@@ -108,8 +111,7 @@ def test_fetch_yahoo_timeout_exhausted(monkeypatch) -> None:
         interval="1d",
         timeout_s=0.1,
         max_attempts=2,
-        backoff_factor=0.0,
     )
 
     assert result.status == "error"
-    assert "code=timeout" in result.message or "code=download_failed" in result.message
+    assert "Timeout" in result.message or "download failed" in result.message

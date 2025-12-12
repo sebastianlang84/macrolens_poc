@@ -30,6 +30,33 @@ def _ensure_dirs(settings: Settings) -> None:
     settings.paths.data_dir.mkdir(parents=True, exist_ok=True)
     settings.paths.logs_dir.mkdir(parents=True, exist_ok=True)
     settings.paths.reports_dir.mkdir(parents=True, exist_ok=True)
+    init_metadata_db(settings.paths.metadata_db)
+
+
+def _record_series_metadata(
+    settings: Settings, spec: SeriesSpec, result: SeriesRunResult
+) -> None:
+    metadata_record = SeriesMetadataRecord(
+        series_id=spec.id,
+        provider=spec.provider,
+        provider_symbol=spec.provider_symbol,
+        category=spec.category,
+        frequency_target=spec.frequency_target,
+        timezone=spec.timezone,
+        units=spec.units,
+        transform=spec.transform,
+        notes=spec.notes,
+        enabled=spec.enabled,
+        status=result.status,
+        message=result.message,
+        last_run_at=result.run_at,
+        last_ok_at=result.run_at if result.status == "ok" else None,
+        last_observation_date=result.last_observation_date,
+        stored_path=result.stored_path,
+        new_points=result.new_points,
+    )
+
+    upsert_series_metadata(settings.paths.metadata_db, metadata_record)
 
 
 @app.callback()
@@ -217,7 +244,11 @@ def run_one(
         }
     )
 
-    result = run_series(settings=settings, spec=spec, lookback_days=lookback_days)
+    result: SeriesRunResult = run_series(
+        settings=settings, spec=spec, lookback_days=lookback_days
+    )
+
+    _record_series_metadata(settings, spec, result)
 
     event = {
         "event": "series_run",

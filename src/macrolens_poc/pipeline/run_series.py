@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +11,7 @@ from macrolens_poc.config import Settings
 from macrolens_poc.sources.matrix import SeriesSpec
 from macrolens_poc.sources.fred import fetch_fred_series_observations
 from macrolens_poc.sources.yahoo import fetch_yahoo_history
-from macrolens_poc.storage.parquet_store import StoreResult, store_series
+from macrolens_poc.storage.parquet_store import StoreResult, load_series, store_series
 
 
 @dataclass(frozen=True)
@@ -63,6 +63,7 @@ def run_series(
     """
 
     observation_start = date.today() - timedelta(days=lookback_days)
+    run_ts = datetime.now(timezone.utc)
 
     if spec.provider == "fred":
         try:
@@ -110,6 +111,8 @@ def run_series(
             message=f"unsupported provider: {spec.provider}",
             stored_path=None,
             new_points=0,
+            last_observation_date=None,
+            run_at=run_ts,
         )
 
     if fetched.data is None:
@@ -120,6 +123,8 @@ def run_series(
             message=fetched.message,
             stored_path=None,
             new_points=0,
+            last_observation_date=None,
+            run_at=run_ts,
         )
 
     try:
@@ -147,6 +152,8 @@ def run_series(
             message=msg,
             stored_path=None,
             new_points=0,
+            last_observation_date=None,
+            run_at=run_ts,
         )
 
     out_path = settings.paths.data_dir / "series" / f"{spec.id}.parquet"
@@ -164,6 +171,11 @@ def run_series(
             error_type=type(exc).__name__,
             error_message=str(exc),
         )
+
+    final_series = load_series(out_path)
+    last_observation_date = (
+        final_series["date"].max().date() if final_series is not None and not final_series.empty else None
+    )
 
     return SeriesRunResult(
         series_id=spec.id,

@@ -17,6 +17,8 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 - Logging-Skeleton für strukturierte Logs (siehe [`src/macrolens_poc/logging_utils.py`](src/macrolens_poc/logging_utils.py:1))
 - Minimaler Test für Milestone M0 (siehe [`tests/test_m0_skeleton.py`](tests/test_m0_skeleton.py:1))
 
+- Status-Report-Snapshot: [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1)
+
 - Provider (M1/M2 minimal):
   - FRED Fetcher: [`src/macrolens_poc/sources/fred.py`](src/macrolens_poc/sources/fred.py:1)
   - Yahoo Finance Fetcher (yfinance): [`src/macrolens_poc/sources/yahoo.py`](src/macrolens_poc/sources/yahoo.py:1)

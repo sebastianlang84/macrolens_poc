@@ -12,7 +12,7 @@ from macrolens_poc.logging_utils import (
     new_run_context,
     run_summary_event,
 )
-from macrolens_poc.pipeline import run_series
+from macrolens_poc.pipeline import run_series, update_matrix_status
 from macrolens_poc.report.generate import (
     DEFAULT_DELTA_WINDOWS,
     generate_series_report,
@@ -87,9 +87,11 @@ def run_all(
 
     status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
     total_new_points = 0
+    run_results = []
 
     for spec in enabled:
         result = run_series(settings=settings, spec=spec, lookback_days=lookback_days)
+        run_results.append(result)
         status_counts[result.status] = status_counts.get(result.status, 0) + 1
         total_new_points += result.new_points
 
@@ -103,6 +105,17 @@ def run_all(
                 "message": result.message,
                 "stored_path": str(result.stored_path) if result.stored_path is not None else None,
                 "new_points": result.new_points,
+            }
+        )
+
+    if run_results:
+        updated_path = update_matrix_status(matrix_result=matrix_result, results=run_results)
+        logger.log(
+            {
+                "event": "matrix_updated",
+                "run_id": run_ctx.run_id,
+                "path": str(updated_path),
+                "series_updated": len(run_results),
             }
         )
 
@@ -183,6 +196,16 @@ def run_one(
             "message": result.message,
             "stored_path": str(result.stored_path) if result.stored_path is not None else None,
             "new_points": result.new_points,
+        }
+    )
+
+    updated_path = update_matrix_status(matrix_result=matrix_result, results=[result])
+    logger.log(
+        {
+            "event": "matrix_updated",
+            "run_id": run_ctx.run_id,
+            "path": str(updated_path),
+            "series_updated": 1,
         }
     )
 

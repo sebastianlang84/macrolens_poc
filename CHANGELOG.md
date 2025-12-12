@@ -27,6 +27,7 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 - Tests für Storage-Merge + Normalize: [`tests/test_m2_storage_merge.py`](tests/test_m2_storage_merge.py:1), [`tests/test_m2_pipeline_normalize.py`](tests/test_m2_pipeline_normalize.py:1)
 - Report-Generation (Markdown + JSON mit Δ1d/Δ5d/Δ21d pro Serie): [`src/macrolens_poc/report/generate.py`](src/macrolens_poc/report/generate.py:1), CLI `report` in [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:1)
 - Tests für Report-Deltas/Artifacts: [`tests/test_report_generate.py`](tests/test_report_generate.py:1)
+- Quellenmatrix speichert `status`/`last_ok` nach Pipeline-Runs zurück (siehe [`src/macrolens_poc/pipeline/matrix_status.py`](src/macrolens_poc/pipeline/matrix_status.py:1))
 
 ### Changed
 

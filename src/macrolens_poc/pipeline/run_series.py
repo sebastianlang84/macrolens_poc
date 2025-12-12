@@ -22,6 +22,10 @@ class SeriesRunResult:
     message: str
     stored_path: Optional[Path]
     new_points: int
+    revision_overwrites_count: int = 0
+    revision_overwrites_sample: Optional[list[dict]] = None
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 def _normalize_timeseries(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,19 +65,43 @@ def run_series(
     observation_start = date.today() - timedelta(days=lookback_days)
 
     if spec.provider == "fred":
-        fetched = fetch_fred_series_observations(
-            series_id=spec.provider_symbol,
-            api_key=settings.fred_api_key,
-            observation_start=observation_start,
-            observation_end=None,
-        )
+        try:
+            fetched = fetch_fred_series_observations(
+                series_id=spec.provider_symbol,
+                api_key=settings.fred_api_key,
+                observation_start=observation_start,
+                observation_end=None,
+            )
+        except Exception as exc:
+            return SeriesRunResult(
+                series_id=spec.id,
+                provider=str(spec.provider),
+                status="error",
+                message="provider fetch failed",
+                stored_path=None,
+                new_points=0,
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+            )
     elif spec.provider == "yfinance":
-        fetched = fetch_yahoo_history(
-            symbol=spec.provider_symbol,
-            start=observation_start,
-            end=None,
-            interval="1d",
-        )
+        try:
+            fetched = fetch_yahoo_history(
+                symbol=spec.provider_symbol,
+                start=observation_start,
+                end=None,
+                interval="1d",
+            )
+        except Exception as exc:
+            return SeriesRunResult(
+                series_id=spec.id,
+                provider=str(spec.provider),
+                status="error",
+                message="provider fetch failed",
+                stored_path=None,
+                new_points=0,
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+            )
     else:
         return SeriesRunResult(
             series_id=spec.id,
@@ -104,6 +132,8 @@ def run_series(
             message=f"normalize failed: {exc}",
             stored_path=None,
             new_points=0,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
         )
 
     # basic validation
@@ -131,6 +161,8 @@ def run_series(
             message=f"store failed: {exc}",
             stored_path=out_path,
             new_points=0,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
         )
 
     return SeriesRunResult(
@@ -140,4 +172,6 @@ def run_series(
         message="ok",
         stored_path=store_result.path,
         new_points=store_result.new_points,
+        revision_overwrites_count=store_result.revision_overwrites_count,
+        revision_overwrites_sample=store_result.revision_overwrites_sample,
     )

@@ -7,12 +7,20 @@ from typing import Any, Dict, Optional
 import pandas as pd
 import requests
 
+from macrolens_poc.retry_utils import RetryConfig, retry_call
+
 
 @dataclass(frozen=True)
 class FetchResult:
     status: str  # ok/warn/error/missing
     message: str
     data: Optional[pd.DataFrame]
+
+
+class RetryableHttpStatus(Exception):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"retryable http status: {status_code}")
+        self.status_code = status_code
 
 
 def fetch_fred_series_observations(
@@ -22,6 +30,7 @@ def fetch_fred_series_observations(
     observation_start: Optional[date] = None,
     observation_end: Optional[date] = None,
     timeout_s: float = 20.0,
+    max_attempts: int = 3,
 ) -> FetchResult:
     """Fetch observations from FRED.
 
@@ -34,6 +43,7 @@ def fetch_fred_series_observations(
     Notes:
     - FRED may return "." for missing values.
     - We use file_type=json.
+    - Provider robustness: retry + exponential backoff on transient failures.
     """
 
     if api_key is None:
@@ -51,13 +61,44 @@ def fetch_fred_series_observations(
     if observation_end is not None:
         params["observation_end"] = observation_end.isoformat()
 
-    try:
-        resp = requests.get(url, params=params, timeout=timeout_s)
+    retryable_status = {429, 500, 502, 503, 504}
+
+    def _do_request() -> requests.Response:
+        # requests' timeout can be (connect, read)
+        timeout = (min(5.0, float(timeout_s)), float(timeout_s))
+        resp = requests.get(url, params=params, timeout=timeout)
+
         if resp.status_code == 404:
-            return FetchResult(status="missing", message=f"FRED series not found: {series_id}", data=None)
+            return resp
+
+        if resp.status_code in retryable_status:
+            raise RetryableHttpStatus(resp.status_code)
+
         resp.raise_for_status()
-    except requests.RequestException as exc:
-        return FetchResult(status="error", message=f"FRED request failed: {exc}", data=None)
+        return resp
+
+    def _should_retry(exc: Exception) -> bool:
+        if isinstance(exc, RetryableHttpStatus):
+            return True
+        if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+            return True
+        return False
+
+    try:
+        resp = retry_call(
+            _do_request,
+            cfg=RetryConfig(max_attempts=max_attempts, base_delay_s=0.5, max_delay_s=8.0, multiplier=2.0),
+            should_retry=_should_retry,
+        )
+    except Exception as exc:
+        return FetchResult(
+            status="error",
+            message=f"FRED request failed: {type(exc).__name__}: {exc}",
+            data=None,
+        )
+
+    if resp.status_code == 404:
+        return FetchResult(status="missing", message=f"FRED series not found: {series_id}", data=None)
 
     try:
         payload = resp.json()

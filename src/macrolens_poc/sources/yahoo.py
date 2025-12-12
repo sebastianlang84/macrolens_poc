@@ -7,6 +7,8 @@ from typing import Optional
 import pandas as pd
 import yfinance as yf
 
+from macrolens_poc.retry_utils import RetryConfig, retry_call
+
 
 @dataclass(frozen=True)
 class FetchResult:
@@ -21,6 +23,7 @@ def fetch_yahoo_history(
     start: Optional[date] = None,
     end: Optional[date] = None,
     interval: str = "1d",
+    max_attempts: int = 3,
 ) -> FetchResult:
     """Fetch historical daily prices from Yahoo Finance via yfinance.
 
@@ -33,12 +36,20 @@ def fetch_yahoo_history(
     Notes:
     - yfinance returns index as DatetimeIndex.
     - We normalize to UTC and pick Close.
+    - Provider robustness: retry + exponential backoff on transient failures.
     """
 
+    def _download() -> pd.DataFrame:
+        return yf.download(symbol, start=start, end=end, interval=interval, progress=False)
+
     try:
-        df = yf.download(symbol, start=start, end=end, interval=interval, progress=False)
+        df = retry_call(
+            _download,
+            cfg=RetryConfig(max_attempts=max_attempts, base_delay_s=0.5, max_delay_s=8.0, multiplier=2.0),
+            should_retry=lambda exc: True,
+        )
     except Exception as exc:  # yfinance can raise various runtime exceptions
-        return FetchResult(status="error", message=f"yfinance download failed: {exc}", data=None)
+        return FetchResult(status="error", message=f"yfinance download failed: {type(exc).__name__}: {exc}", data=None)
 
     if df is None or df.empty:
         return FetchResult(status="warn", message="yfinance returned 0 rows", data=pd.DataFrame(columns=["date", "value"]))

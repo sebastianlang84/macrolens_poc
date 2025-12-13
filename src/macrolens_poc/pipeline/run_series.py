@@ -26,12 +26,8 @@ class SeriesRunResult:
     revision_overwrites_sample: Optional[list[dict]] = None
     error_type: Optional[str] = None
     error_message: Optional[str] = None
-
-    # Optional extras (non-breaking additions)
-    revision_overwrites_count: int = 0
-    revision_overwrites_sample: Optional[list[dict]] = None
-    error_type: Optional[str] = None
-    error_message: Optional[str] = None
+    last_observation_date: Optional[date] = None
+    run_at: Optional[datetime] = None
 
 
 def _normalize_timeseries(df: pd.DataFrame) -> pd.DataFrame:
@@ -202,4 +198,6 @@ def run_series(
         new_points=store_result.new_points,
         revision_overwrites_count=store_result.revision_overwrites_count,
         revision_overwrites_sample=store_result.revision_overwrites_sample,
+        last_observation_date=last_observation_date,
+        run_at=run_ts,
     )

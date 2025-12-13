@@ -10,6 +10,9 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 ## [Unreleased]
 
 ### Added
+- Pipeline: `last_observation_date` und `run_at` im `SeriesRunResult` und `series_run` Event.
+- Yahoo Source: `timeout_s` Parameter für `fetch_yahoo_history` (Default: 10.0s).
+
 ## [0.1.0] - 2025-12-12
 
 ### Added

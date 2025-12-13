@@ -25,6 +25,7 @@ def fetch_yahoo_history(
     start: Optional[date] = None,
     end: Optional[date] = None,
     interval: str = "1d",
+    timeout_s: float = 10.0,
     max_attempts: int = 3,
 ) -> FetchResult:
     """Fetch historical daily prices from Yahoo Finance via yfinance.

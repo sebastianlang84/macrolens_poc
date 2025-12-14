@@ -12,6 +12,7 @@ import pandas as pd
 
 from macrolens_poc.config import Settings
 from macrolens_poc.sources import load_sources_matrix
+from macrolens_poc.sources.matrix_status import default_matrix_status_path, load_matrix_status
 from macrolens_poc.storage.parquet_store import load_series
 
 
@@ -21,6 +22,8 @@ class SeriesRow:
     category: str
     last: Optional[float]
     deltas: dict[str, Optional[float]]  # keys: d1, d5, d21
+    status: str = "ok"
+    status_message: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -159,12 +162,17 @@ def render_report_markdown(report: ReportV1) -> str:
 
     lines.append("## Series Table")
     lines.append("")
-    lines.append("| id | category | last | Δ1d | Δ5d | Δ21d |")
-    lines.append("|---|---|---:|---:|---:|---:|")
+    lines.append("| id | category | last | Δ1d | Δ5d | Δ21d | status |")
+    lines.append("|---|---|---:|---:|---:|---:|---|")
     for row in report.table:
         d1 = row.deltas.get("d1")
         d5 = row.deltas.get("d5")
         d21 = row.deltas.get("d21")
+        
+        status_str = row.status
+        if row.status != "ok" and row.status_message:
+            status_str += f" ({row.status_message})"
+
         lines.append(
             "| "
             + " | ".join(
@@ -175,6 +183,7 @@ def render_report_markdown(report: ReportV1) -> str:
                     _format_md_number(_to_float_or_none(d1)),
                     _format_md_number(_to_float_or_none(d5)),
                     _format_md_number(_to_float_or_none(d21)),
+                    status_str,
                 ]
             )
             + " |"
@@ -210,17 +219,23 @@ def write_report_files(*, report: ReportV1, reports_dir: Path) -> tuple[Path, Pa
     return md_path, json_path
 
 
-def generate_report_v1(*, settings: Settings, now_utc: Optional[datetime] = None) -> ReportV1WriteResult:
+def generate_report_v1(*, settings: Settings, as_of: Optional[datetime] = None) -> ReportV1WriteResult:
     """Generate Report v1 based on stored series files."""
 
-    now_utc = now_utc or datetime.now(timezone.utc)
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.replace(tzinfo=timezone.utc)
 
     report_tz = ZoneInfo(settings.report_tz)
-    as_of_date = now_utc.astimezone(report_tz).date()
+    as_of_date = run_ts.astimezone(report_tz).date()
     as_of_date_str = as_of_date.strftime("%Y-%m-%d")
 
     matrix_result = load_sources_matrix(settings.sources_matrix_path)
     enabled = [s for s in matrix_result.matrix.series if s.enabled]
+
+    # Load status to enrich report
+    status_file = load_matrix_status(default_matrix_status_path(settings.paths.data_dir))
+    status_map = status_file.series
 
     table: list[SeriesRow] = []
     rows_by_id: dict[str, SeriesRow] = {}
@@ -230,6 +245,12 @@ def generate_report_v1(*, settings: Settings, now_utc: Optional[datetime] = None
         df = load_series(p)
 
         last, deltas = _series_last_and_deltas(df, windows_days=[1, 5, 21])
+        
+        # Get status info
+        st_entry = status_map.get(spec.id)
+        status = st_entry.status if st_entry else "unknown"
+        status_msg = st_entry.last_error if st_entry else None
+
         row = SeriesRow(
             id=spec.id,
             category=spec.category,
@@ -239,6 +260,8 @@ def generate_report_v1(*, settings: Settings, now_utc: Optional[datetime] = None
                 "d5": deltas[5],
                 "d21": deltas[21],
             },
+            status=status,
+            status_message=status_msg,
         )
         table.append(row)
         rows_by_id[row.id] = row
@@ -248,7 +271,7 @@ def generate_report_v1(*, settings: Settings, now_utc: Optional[datetime] = None
     report = ReportV1(
         meta={
             "as_of_date": as_of_date_str,
-            "generated_at_utc": now_utc.astimezone(timezone.utc).isoformat(),
+            "generated_at_utc": run_ts.astimezone(timezone.utc).isoformat(),
         },
         table=table,
         risk_flags=risk_flags,

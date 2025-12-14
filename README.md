@@ -7,8 +7,8 @@ Lokaler Python-PoC für Makro-/Marktdaten-Ingestion, Normalisierung, Storage und
 | Dokument | Zielgruppe | Inhalt |
 |---|---|---|
 | [`README.md`](README.md:1) | **Nutzer** | Quickstart, Installation, Usage, Konfiguration. |
-| [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1) | **Alle** | Aktueller Status-Snapshot, bekannte Probleme, Entscheidungen. |
-| [`PRD.md`](PRD.md:1) | **Alle** | Requirements, Scope, Architektur-Ziele. |
+| [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1) | **Alle** | Aktueller Status-Snapshot, bekannte Probleme, Entscheidungen. |
+| [`docs/PRD.md`](docs/PRD.md:1) | **Alle** | Requirements, Scope, Architektur-Ziele. |
 | [`AGENTS.md`](AGENTS.md:1) | **Contributor/Agents** | Arbeitsregeln, Coding-Standards, Commit-Konventionen. |
 | [`TODO.md`](TODO.md:1) | **Contributor** | Aktive Tasks, Backlog, Roadmap. |
 | [`CHANGELOG.md`](CHANGELOG.md:1) | **Alle** | Historie der Änderungen (Versionshinweise). |
@@ -41,6 +41,7 @@ Nach `python3 -m pip install -e '.[dev]'` stehen Targets in [`Makefile`](Makefil
 - `run_all` – alle enabled Serien backfillen (`LOOKBACK_DAYS` optional, Default: `3650`).
 - `run_one` – eine Serie per `--id` (`make run_one ID=<series_id> ...`).
 - `report` – Markdown/JSON-Report unter [`reports/.gitkeep`](reports/.gitkeep:1) erzeugen.
+- `analyze` – KI-gestützte Analyse der Reports (benötigt `OPENAI_API_KEY`).
 - `lint` – statische Prüfung via `ruff` auf `src/` und `tests/`.
 - `format` – Formatierung via `black` auf `src/` und `tests/`.
 - `smoke` – kurzer Check via `pytest -q` (Minimaltest).
@@ -100,6 +101,9 @@ macrolens-poc --config config/config.example.yaml run-all --lookback-days 3650
 
 # Report aus gespeicherten Serien (Markdown + JSON unter `reports/`)
 macrolens-poc --config config/config.example.yaml report
+
+# KI-Analyse (benötigt OPENAI_API_KEY in .env)
+macrolens-poc --config config/config.example.yaml analyze
 ```
 
 ## Report ausführen
@@ -115,5 +119,19 @@ Output:
 - Reports unter [`reports/`](reports/.gitkeep:1)
 - Logs weiterhin unter [`logs/`](logs/.gitkeep:1)
 
-Details zum aktuellen Projektstatus siehe [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1).
+## KI-Analyse (OpenAI)
+
+Der `analyze` Befehl nutzt ein LLM (OpenAI), um die generierten Reports zusammenzufassen und eine Markteinschätzung zu geben.
+
+Voraussetzung:
+- `OPENAI_API_KEY` in `.env` gesetzt.
+- Reports wurden zuvor generiert (`macrolens-poc report`).
+
+```bash
+macrolens-poc analyze
+```
+
+Das Ergebnis wird auf der Konsole ausgegeben und (optional) als Markdown gespeichert (Default: stdout).
+
+Details zum aktuellen Projektstatus siehe [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1).
 Nächste Arbeitspakete siehe [`TODO.md`](TODO.md:1).

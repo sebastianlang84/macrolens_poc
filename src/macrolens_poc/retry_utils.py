@@ -22,6 +22,21 @@ class RetryConfig:
     multiplier: float = 2.0
 
 
+def simple_retry(
+    fn: Callable[[], T],
+    max_attempts: int = 3,
+    delay: float = 1.0,
+    exceptions: tuple = (Exception,),
+) -> T:
+    """Simple retry wrapper for basic use cases."""
+    cfg = RetryConfig(max_attempts=max_attempts, base_delay_s=delay)
+    return retry_call(
+        fn,
+        cfg=cfg,
+        should_retry=lambda e: isinstance(e, exceptions),
+    )
+
+
 def retry_call(
     fn: Callable[[], T],
     *,

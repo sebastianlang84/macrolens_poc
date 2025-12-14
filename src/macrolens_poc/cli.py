@@ -13,6 +13,7 @@ from macrolens_poc.logging_utils import (
     new_run_context,
     run_summary_event,
 )
+from macrolens_poc.llm.service import AnalysisService
 from macrolens_poc.pipeline import SeriesRunResult, run_series
 from macrolens_poc.report import generate_report_v1
 from macrolens_poc.sources import load_sources_matrix
@@ -174,7 +175,11 @@ def run_all(
     settings: Settings = ctx.obj["settings"]
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
-    as_of_date = as_of.date() if as_of else None
+
+    # Deterministic run time
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.replace(tzinfo=timezone.utc)
 
     logger.log(
         {
@@ -185,7 +190,7 @@ def run_all(
             "report_tz": settings.report_tz,
             "sources_matrix_path": str(settings.sources_matrix_path),
             "lookback_days": lookback_days,
-            "as_of_date": as_of_date.isoformat() if as_of_date else None,
+            "as_of": run_ts.isoformat(),
         }
     )
 
@@ -208,7 +213,7 @@ def run_all(
 
     for spec in enabled:
         result = run_series(
-            settings=settings, spec=spec, lookback_days=lookback_days, as_of_date=as_of_date
+            settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts
         )
         results.append(result)
         status_counts[result.status] = status_counts.get(result.status, 0) + 1
@@ -245,7 +250,11 @@ def run_one(
     settings: Settings = ctx.obj["settings"]
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
-    as_of_date = as_of.date() if as_of else None
+
+    # Deterministic run time
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.replace(tzinfo=timezone.utc)
 
     logger.log(
         {
@@ -257,7 +266,7 @@ def run_one(
             "report_tz": settings.report_tz,
             "sources_matrix_path": str(settings.sources_matrix_path),
             "lookback_days": lookback_days,
-            "as_of_date": as_of_date.isoformat() if as_of_date else None,
+            "as_of": run_ts.isoformat(),
         }
     )
 
@@ -297,7 +306,7 @@ def run_one(
     )
 
     result = run_series(
-        settings=settings, spec=spec, lookback_days=lookback_days, as_of_date=as_of_date
+        settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts
     )
     _record_series_metadata(settings, spec, result)
     _log_series_run(logger, run_id=run_ctx.run_id, result=result)
@@ -330,9 +339,9 @@ def report(
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
 
-    now_utc = as_of if as_of else datetime.now(timezone.utc)
-    if now_utc.tzinfo is None:
-        now_utc = now_utc.replace(tzinfo=timezone.utc)
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.replace(tzinfo=timezone.utc)
 
     logger.log(
         {
@@ -342,11 +351,11 @@ def report(
             "data_tz": settings.data_tz,
             "report_tz": settings.report_tz,
             "sources_matrix_path": str(settings.sources_matrix_path),
-            "as_of": now_utc.isoformat(),
+            "as_of": run_ts.isoformat(),
         }
     )
 
-    result = generate_report_v1(settings=settings, now_utc=now_utc)
+    result = generate_report_v1(settings=settings, as_of=run_ts)
 
     logger.log(
         {
@@ -361,6 +370,59 @@ def report(
     )
 
     logger.log(run_summary_event(ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0}))
+
+
+@app.command()
+def analyze(
+    ctx: typer.Context,
+    report_file: Path = typer.Option(..., "--report-file", help="Path to input JSON report"),
+    output: Path = typer.Option(..., "--output", help="Path to output Markdown analysis"),
+) -> None:
+    """Analyze a report using LLM."""
+    settings: Settings = ctx.obj["settings"]
+    run_ctx = new_run_context()
+    logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
+
+    logger.log(
+        {
+            "event": "command_start",
+            "command": "analyze",
+            "run_id": run_ctx.run_id,
+            "report_file": str(report_file),
+            "output": str(output),
+            "model": settings.llm.model,
+        }
+    )
+
+    try:
+        service = AnalysisService(settings)
+        analysis_md = service.analyze_report(report_file)
+
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(analysis_md, encoding="utf-8")
+
+        logger.log(
+            {
+                "event": "analysis_generated",
+                "run_id": run_ctx.run_id,
+                "report_file": str(report_file),
+                "output": str(output),
+                "bytes_written": len(analysis_md),
+            }
+        )
+        logger.log(run_summary_event(ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0}))
+
+    except Exception as e:
+        logger.log(
+            {
+                "event": "analysis_failed",
+                "run_id": run_ctx.run_id,
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            }
+        )
+        logger.log(run_summary_event(ctx=run_ctx, status_counts={"ok": 0, "warn": 0, "error": 1, "missing": 0}))
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

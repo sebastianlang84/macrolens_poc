@@ -23,6 +23,9 @@ class SeriesSpec(BaseModel):
     transform: str = Field(default="none")
     notes: str = Field(default="")
 
+    # Staleness override (if None, use global default)
+    stale_days: Optional[int] = Field(default=None)
+
     enabled: bool = Field(default=True)
 
     # system-maintained (optional in static matrix file)

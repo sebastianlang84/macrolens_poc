@@ -18,7 +18,7 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
   - **Keine erfundenen API-Signaturen, Zahlen, Zitate oder Bibliotheksdetails.**
   - Unsicherheit klar markieren (z. B. „gesichert / wahrscheinlich / unsicher“).
 - **Repo-first (Grounding)**
-  - Zuerst Repo-Dateien/Configs lesen (z. B. [`PRD.md`](PRD.md:1)), dann erst externe Quellen.
+  - Zuerst Repo-Dateien/Configs lesen (z. B. [`docs/PRD.md`](docs/PRD.md:1)), dann erst externe Quellen.
 - **Kleine, nachvollziehbare Diffs**
   - Änderungen in kleinen Schritten; keine „Mega-PRs“.
 
@@ -27,8 +27,8 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 ## 2) Projekt-Kontext & Links
 
 - **Primary Entry Point**: [`README.md`](README.md:1) (Quickstart, Installation, Usage).
-- **Requirements**: [`PRD.md`](PRD.md:1).
-- **Status**: [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1).
+- **Requirements**: [`docs/PRD.md`](docs/PRD.md:1).
+- **Status**: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1).
 
 ---
 
@@ -42,7 +42,7 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ### 3.2 Determinismus & Reproduzierbarkeit
 
-- Ziel: reproduzierbarer Run (Lockfile/Dependencies, deterministische Outputs bei gleichem Input) gemäß [`PRD.md`](PRD.md:122).
+- Ziel: reproduzierbarer Run (Lockfile/Dependencies, deterministische Outputs bei gleichem Input) gemäß [`docs/PRD.md`](docs/PRD.md:122).
 - Zeit/Zeitzone explizit dokumentieren und im Code konsequent umsetzen.
 
 ### 3.3 Logging & Robustheit
@@ -57,7 +57,7 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ### 3.5 Code-/DX-Standards
 
-- Bevorzugt: klarer Modul-Schnitt (config/sources/pipeline/storage/report) analog [`PRD.md`](PRD.md:99).
+- Bevorzugt: klarer Modul-Schnitt (config/sources/pipeline/storage/report) analog [`docs/PRD.md`](docs/PRD.md:99).
 - Minimal-Tests für kritische Logik (z. B. Matrix-Loader, Storage-Merge).
 - CLI-Kommandos sollen dokumentiert und stabil sein (help-Text, deterministisches Verhalten).
 
@@ -99,7 +99,7 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ## 5) Arbeitsabfolge (Standard)
 
-1. Relevante Repo-Dateien lesen (mind. [`PRD.md`](PRD.md:1), ggf. [`README.md`](README.md:1)).
+1. Relevante Repo-Dateien lesen (mind. [`docs/PRD.md`](docs/PRD.md:1), ggf. [`README.md`](README.md:1)).
 2. Plan in 3–7 Schritten (klein, überprüfbar).
 3. Implementieren in kleinen Diffs.
 4. Minimaler Smoke-Check (z. B. Import/CLI Help/Unit-Test) sofern möglich.
@@ -177,7 +177,7 @@ Normalization-Contract (Pipeline):
 ## 11) Minimal Definition of Done (DoD)
 
 - [ ] Änderung ist klein & nachvollziehbar (kein „Mega-Diff“)
-- [ ] Repo-first eingehalten: relevante Dateien gelesen/gelinkt (z. B. [`PRD.md`](PRD.md:1))
+- [ ] Repo-first eingehalten: relevante Dateien gelesen/gelinkt (z. B. [`docs/PRD.md`](docs/PRD.md:1))
 - [ ] Smoke: `macrolens-poc --help` funktioniert (Entry: [`pyproject.toml`](pyproject.toml:25))
 - [ ] Tests: `python -m pytest` grün
 - [ ] Keine Secrets/Outputs committet (siehe Abschnitt 3.1 und 7)

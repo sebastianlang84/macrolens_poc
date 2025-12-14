@@ -1,11 +1,14 @@
 # Project Status (Snapshot)
 
 ## Overview
-- Milestone M1/M2 goals met: ingestion pipeline for enabled sources via CLI, normalization, and Parquet storage are in place (siehe [`README.md`](README.md:79)).
-- Current providers: FRED ([`fetch_fred_series_observations()`](src/macrolens_poc/sources/fred.py:26)) and Yahoo Finance via `yfinance` ([`fetch_yahoo_history()`](src/macrolens_poc/sources/yahoo.py:20)).
-- CLI commands `run-all` / `run-one` execute pipeline runs with structured JSONL logging (`command_start`, `series_run`, `run_summary`; siehe [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:159)).
-- `report` generates Markdown/JSON artifacts under [`reports/`](reports/.gitkeep:1) and includes a simple deterministic risk regime flag (siehe [`src/macrolens_poc/report/v1.py`](src/macrolens_poc/report/v1.py:117)).
-- Configuration relies on `.env` + optional YAML via global `--config`; paths are centralized in `Settings` (siehe [`src/macrolens_poc/config.py`](src/macrolens_poc/config.py:18) und [`config/config.example.yaml`](config/config.example.yaml:1)).
+- **Status:** Feature Complete (POC).
+- **Milestone M4 (KI-Analyse) Completed:** `analyze` command integrates OpenAI for market summaries.
+- **Core Pipeline:** Ingestion, Normalization, Storage (Parquet) fully functional.
+- **New Features:**
+    - **Stale Detection:** Warns about outdated series based on configured frequency.
+    - **Determinism:** Strict `as_of` logic (UTC) ensures reproducible runs.
+- Current providers: FRED and Yahoo Finance (yfinance).
+- CLI commands: `run-all`, `run-one`, `report`, `analyze`.
 
 ## Latest Test Run (2025-12-12)
 
@@ -48,9 +51,9 @@ Umgebungshinweis:
 
 ## Suggested Next Steps
 - Narrow retry conditions for yfinance and log retry attempts (attempt index + delay) for better diagnosability.
-- Add stale-series detection and a human-readable matrix status view/export.
 - Extend risk flag rule set and include explicit dependencies/assumptions in report metadata.
 - Consider a manifest/partitioning strategy if series count grows beyond the current PoC scope.
+- Refine LLM prompts for more specific investment horizon analysis.
 
 ## Review Cadence
 - Wöchentliches Update der offenen Fragen/Entscheidungen im Planning; Kurz-Check im Standup bis Klarheit zu Provider- und Coverage-Entscheidungen.

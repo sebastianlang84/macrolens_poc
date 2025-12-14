@@ -2,7 +2,7 @@
 
 ## Now (M1/M2) — Matrix + Provider + Pipeline/Storage
 
-- [x] Data-Source-Matrix: Schema + Datei definieren (YAML/CSV/JSON) gem. [`PRD.md`](PRD.md:65)
+- [x] Data-Source-Matrix: Schema + Datei definieren (YAML/CSV/JSON) gem. [`docs/PRD.md`](docs/PRD.md:65)
 - [x] Matrix-Loader + Schema-Validation (z. B. pydantic)
 - [x] Matrix-Statusfelder automatisch pflegen (`last_ok`, `status`)
 - [x] Provider-Adapter: FRED (Series by id, start/end)
@@ -19,7 +19,7 @@
 ## Next (M3) — Report v1
 
 - [x] Aggregator: letzter Wert + Δ1d/Δ5d/Δ21d
-- [x] Simple Risk Flags (Heuristiken) gem. [`PRD.md`](PRD.md:93)
+- [x] Simple Risk Flags (Heuristiken) gem. [`docs/PRD.md`](docs/PRD.md:93)
 - [x] Export: Markdown + JSON (z. B. `reports/report-YYYYMMDD.md` + `.json`)
 
 ## Next (M4) — AI Analysis (The "Missing Link")
@@ -91,15 +91,15 @@
 ### 4) Docs & Repo-Hygiene (Entdriftung + Platzhalter entfernen)
 
 - [ ] Decision: **Single Source of Truth für Quickstart/Contracts festlegen (und Cross-Links definieren)**
-  - Option A: Nutzer-Doku/Quickstart in [`README.md`](README.md:1); Contributor-Regeln in [`AGENTS.md`](AGENTS.md:1); Anforderungen in [`PRD.md`](PRD.md:1); Status-Snapshot nur in [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1)
+  - Option A: Nutzer-Doku/Quickstart in [`README.md`](README.md:1); Contributor-Regeln in [`AGENTS.md`](AGENTS.md:1); Anforderungen in [`docs/PRD.md`](docs/PRD.md:1); Status-Snapshot nur in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1)
   - Option B: Alternative Aufteilung (explizit begründen) + Mapping-Tabelle in [`README.md`](README.md:1)
   - DoD/Output: Entscheidung + Mapping-Tabelle (Dokument → Zweck/Owner) festgehalten.
 
 - [ ] Follow-up: **Quickstart/Contracts deduplizieren (README ↔ AGENTS ↔ PRD ↔ PROJECT_STATUS)**
-  - DoD/Output: keine widersprüchlichen Beispiele/Flags/Artefaktpfade; globaler `--config` Callback explizit genannt (vgl. [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:35)); README enthält nur „current“ Quickstart, Snapshots wandern nach [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1).
+  - DoD/Output: keine widersprüchlichen Beispiele/Flags/Artefaktpfade; globaler `--config` Callback explizit genannt (vgl. [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:35)); README enthält nur „current“ Quickstart, Snapshots wandern nach [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1).
 
 - [ ] **PRD TODO-Block konsolidieren (doppelte TODOs vermeiden)**
-  - Kontext: TODO-Block in [`PRD.md`](PRD.md:1)
+  - Kontext: TODO-Block in [`docs/PRD.md`](docs/PRD.md:1)
   - DoD/Output: PRD enthält nur Requirements/Scope; aktive Tasks sind in [`TODO.md`](TODO.md:1) (oder PRD verlinkt sauber auf TODO ohne Doppelung).
 
 - [ ] **CHANGELOG Release-Platzhalter bereinigen und Release-Flow konsistent machen**

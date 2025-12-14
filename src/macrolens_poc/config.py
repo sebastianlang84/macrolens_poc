@@ -15,6 +15,18 @@ class PathsConfig(BaseModel):
     metadata_db: Path = Field(default=Path("data/metadata.sqlite"))
 
 
+class LLMConfig(BaseModel):
+    # API Key wird primär aus Environment Variable (OPENAI_API_KEY) gelesen
+    # Kann optional auch hier gesetzt werden (aber nicht empfohlen für Secrets)
+    api_key: Optional[str] = Field(default=None)
+
+    # Modell-Auswahl (z.B. gpt-4-turbo, gpt-3.5-turbo)
+    model: str = Field(default="gpt-4-turbo")
+
+    # Kreativität vs. Determinismus
+    temperature: float = Field(default=0.0)
+
+
 class Settings(BaseModel):
     """Application settings.
 
@@ -34,7 +46,12 @@ class Settings(BaseModel):
 
     sources_matrix_path: Path = Field(default=Path("config/sources_matrix.yaml"))
 
+    # Staleness detection
+    stale_days_default: int = Field(default=5)
+
     fred_api_key: Optional[str] = Field(default=None)
+
+    llm: LLMConfig = Field(default_factory=LLMConfig)
 
     paths: PathsConfig = Field(default_factory=PathsConfig)
 
@@ -70,6 +87,8 @@ def load_settings(config_path: Optional[Path]) -> Settings:
     env_data_tz = _getenv("DATA_TZ")
     env_report_tz = _getenv("REPORT_TZ")
     env_fred_api_key = _getenv("FRED_API_KEY")
+    env_openai_api_key = _getenv("OPENAI_API_KEY")
+    env_llm_model = _getenv("LLM_MODEL")
 
     if env_data_tz is not None:
         merged["data_tz"] = env_data_tz
@@ -77,6 +96,14 @@ def load_settings(config_path: Optional[Path]) -> Settings:
         merged["report_tz"] = env_report_tz
     if env_fred_api_key is not None:
         merged["fred_api_key"] = env_fred_api_key
+
+    # LLM env overrides
+    if "llm" not in merged:
+        merged["llm"] = {}
+    if env_openai_api_key is not None:
+        merged["llm"]["api_key"] = env_openai_api_key
+    if env_llm_model is not None:
+        merged["llm"]["model"] = env_llm_model
 
     if config_path is not None:
         cfg = _load_yaml(config_path)

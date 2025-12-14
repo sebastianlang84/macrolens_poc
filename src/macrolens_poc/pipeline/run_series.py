@@ -55,7 +55,7 @@ def run_series(
     settings: Settings,
     spec: SeriesSpec,
     lookback_days: int = 3650,
-    as_of_date: Optional[date] = None,
+    as_of: Optional[datetime] = None,
 ) -> SeriesRunResult:
     """Fetch + normalize + store one series.
 
@@ -63,16 +63,15 @@ def run_series(
       data/series/{id}.parquet
 
     lookback_days is a pragmatic default to avoid full-history fetch for some providers.
-    as_of_date overrides the reference date (default: UTC today).
+    as_of overrides the reference date/time (default: UTC now).
     """
 
-    ref_date = as_of_date if as_of_date is not None else datetime.now(timezone.utc).date()
-    observation_start = ref_date - timedelta(days=lookback_days)
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.replace(tzinfo=timezone.utc)
 
-    if as_of_date:
-        run_ts = datetime.combine(as_of_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-    else:
-        run_ts = datetime.now(timezone.utc)
+    ref_date = run_ts.date()
+    observation_start = ref_date - timedelta(days=lookback_days)
 
     if spec.provider == "fred":
         try:
@@ -190,11 +189,22 @@ def run_series(
         final_series["date"].max().date() if final_series is not None and not final_series.empty else None
     )
 
+    # Staleness check
+    status = fetched.status
+    message = "ok"
+
+    if status == "ok" and last_observation_date is not None:
+        threshold = spec.stale_days if spec.stale_days is not None else settings.stale_days_default
+        delta_days = (ref_date - last_observation_date).days
+        if delta_days > threshold:
+            status = "warn"
+            message = f"stale: last data {delta_days} days ago (threshold: {threshold})"
+
     return SeriesRunResult(
         series_id=spec.id,
         provider=spec.provider,
-        status=fetched.status,
-        message="ok",
+        status=status,
+        message=message,
         stored_path=store_result.path,
         new_points=store_result.new_points,
         revision_overwrites_count=store_result.revision_overwrites_count,

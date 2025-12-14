@@ -168,5 +168,5 @@ NFR5: Keine Secrets in Git.
 
 ## 11) Roadmap & Status
 
-Die detaillierte Roadmap, offene Fragen und der aktuelle Backlog werden in [`TODO.md`](TODO.md:1) gepflegt.
+Die detaillierte Roadmap, offene Fragen und der aktuelle Backlog werden in [`../TODO.md`](../TODO.md:1) gepflegt.
 Der aktuelle Projektstatus (Snapshot) findet sich in [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1).

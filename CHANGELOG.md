@@ -12,6 +12,13 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 ### Added
 - Pipeline: `last_observation_date` und `run_at` im `SeriesRunResult` und `series_run` Event.
 - Yahoo Source: `timeout_s` Parameter für `fetch_yahoo_history` (Default: 10.0s).
+- Docs: Konsolidierung von `README.md`, `PRD.md` und `PROJECT_STATUS.md` (Single Source of Truth).
+- Docs: Härtung von `.gitignore` für Artefakte.
+
+### Changed
+- Pipeline: Deterministischer `as_of` Parameter (UTC) statt `date.today()`.
+- Matrix: Deterministische Sortierung der Serien beim Laden.
+- Yahoo Source: Verbesserte Retry-Logik (transient vs. permanent errors).
 
 ## [0.1.0] - 2025-12-12
 

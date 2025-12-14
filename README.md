@@ -2,11 +2,16 @@
 
 Lokaler Python-PoC für Makro-/Marktdaten-Ingestion, Normalisierung, Storage und Report-Generierung.
 
-**Wichtige Links:**
-- **Requirements & Scope**: [`PRD.md`](PRD.md:1)
-- **Aktueller Status**: [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1)
-- **Agent Rules**: [`AGENTS.md`](AGENTS.md:1)
-- **Changelog**: [`CHANGELOG.md`](CHANGELOG.md:1)
+## Dokumentation & Referenzen
+
+| Dokument | Zielgruppe | Inhalt |
+|---|---|---|
+| [`README.md`](README.md:1) | **Nutzer** | Quickstart, Installation, Usage, Konfiguration. |
+| [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1) | **Alle** | Aktueller Status-Snapshot, bekannte Probleme, Entscheidungen. |
+| [`PRD.md`](PRD.md:1) | **Alle** | Requirements, Scope, Architektur-Ziele. |
+| [`AGENTS.md`](AGENTS.md:1) | **Contributor/Agents** | Arbeitsregeln, Coding-Standards, Commit-Konventionen. |
+| [`TODO.md`](TODO.md:1) | **Contributor** | Aktive Tasks, Backlog, Roadmap. |
+| [`CHANGELOG.md`](CHANGELOG.md:1) | **Alle** | Historie der Änderungen (Versionshinweise). |
 
 ## Quickstart
 
@@ -81,12 +86,7 @@ Repo-Verzeichnisse sind angelegt (Platzhalter via `.gitkeep`):
 - Logs: [`logs/.gitkeep`](logs/.gitkeep:1) (JSONL: `logs/run-YYYYMMDD.jsonl`)
 - Reports: [`reports/.gitkeep`](reports/.gitkeep:1)
 
-## Status / Scope
-
-- M0: Repo + Skeleton ✅
-- M1/M2 (minimal): Provider (FRED + Yahoo via yfinance) + Pipeline + Parquet-Storage ✅
-
-CLI Usage:
+## CLI Usage
 
 ```bash
 # optional: YAML config (sonst Defaults + .env)
@@ -102,28 +102,7 @@ macrolens-poc --config config/config.example.yaml run-all --lookback-days 3650
 macrolens-poc --config config/config.example.yaml report
 ```
 
-## Minimal Run (durchgeführt)
-
-Ausgeführter Minimal-Run:
-
-```bash
-macrolens-poc --config config/config.example.yaml run-all --lookback-days 10
-```
-
-Beobachtungen aus dem Testlauf (Exit-Code 0):
-
-- Smoke war grün: `macrolens-poc --help` ok, `python3 -m pytest` → 22 passed.
-- Run-Summary im JSONL: `ok=4`, `warn=5`, `error=6`, `missing=0`.
-- Artefakte wurden unter [`data/`](data/.gitkeep:1) geschrieben; Logs unter [`logs/`](logs/.gitkeep:1), Beispiel: [`logs/run-20251212.jsonl`](logs/run-20251212.jsonl:1).
-- Durch [`run_all()`](src/macrolens_poc/cli.py:160) werden **keine** Reports erzeugt; Reports laufen separat über [`report()`](src/macrolens_poc/cli.py:302).
-
-### Häufige Warnungen/Errors (aus dem Testlauf)
-
-- FRED: bei `--lookback-days 10` können für niedrigfrequente Makroserien `0 observations` auftreten (Status `warn`). Empfehlung: Lookback erhöhen (z. B. `3650`).
-- Yahoo/yfinance: mehrere Serien schlugen fehl mit `TypeError: arg must be a list, tuple, 1-d array, or Series` (Status `error`) sowie einer `FutureWarning` bzgl. `auto_adjust` (siehe [`src/macrolens_poc/sources/yahoo.py`](src/macrolens_poc/sources/yahoo.py:1)).
-- FRED: ein Error (Serie `gold_usd`) wurde als `error` gezählt, aber ohne `error_type`/`error_message` im Subtask-Report; Details stehen im JSONL (Logfelder werden nur geschrieben, wenn sie im Ergebnis gesetzt sind; siehe [`_log_series_run()`](src/macrolens_poc/cli.py:86)).
-
-## Report danach ausführen
+## Report ausführen
 
 Report-Erzeugung (separater Schritt):
 
@@ -136,4 +115,5 @@ Output:
 - Reports unter [`reports/`](reports/.gitkeep:1)
 - Logs weiterhin unter [`logs/`](logs/.gitkeep:1)
 
-Nächste Arbeitspakete (M3+) siehe [`TODO.md`](TODO.md:1) und Roadmap / Anforderungen in [`PRD.md`](PRD.md:195).
+Details zum aktuellen Projektstatus siehe [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1).
+Nächste Arbeitspakete siehe [`TODO.md`](TODO.md:1).

@@ -63,9 +63,10 @@ def run_series(
       data/series/{id}.parquet
 
     lookback_days is a pragmatic default to avoid full-history fetch for some providers.
+    as_of_date overrides the reference date (default: UTC today).
     """
 
-    ref_date = as_of_date if as_of_date is not None else date.today()
+    ref_date = as_of_date if as_of_date is not None else datetime.now(timezone.utc).date()
     observation_start = ref_date - timedelta(days=lookback_days)
 
     if as_of_date:

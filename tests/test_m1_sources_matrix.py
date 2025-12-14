@@ -24,3 +24,7 @@ def test_load_sources_matrix_ok() -> None:
     assert "sp500" in series_by_id
     assert series_by_id["sp500"].provider == "yfinance"
     assert series_by_id["sp500"].provider_symbol == "^GSPC"
+
+    # Verify the list is sorted by ID
+    ids = [s.id for s in result.matrix.series]
+    assert ids == sorted(ids), "Series list must be sorted by ID for determinism"

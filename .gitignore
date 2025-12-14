@@ -30,6 +30,9 @@ logs/*
 
 data/*
 !data/.gitkeep
+# Explicitly ignore generated metadata/status files in data/
+data/metadata.sqlite
+data/matrix_status.json
 
 reports/*
 !reports/.gitkeep

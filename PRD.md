@@ -166,34 +166,7 @@ NFR5: Keine Secrets in Git.
   * Status `missing`.
   * Logeintrag inkl. Serien-ID.
 
-## 11) Roadmap
+## 11) Roadmap & Status
 
-### Milestone M0: Repo + Skeleton
-
-* Ordnerstruktur, CLI, Config laden.
-
-### M1: Provider Adapter
-
-* FRED Adapter.
-* Yahoo Finance Adapter.
-
-### M2: Pipeline + Storage
-
-* Normalize + Validate.
-* Storage (Parquet bevorzugt).
-
-### M3: Report v1
-
-* Deltas + Flags.
-* Markdown + JSON Export.
-
-### M4: Monitoring
-
-* Stale-series detection.
-* „Matrix status“ export.
-
-## 12) Open Questions (für später, nicht blocker für PoC)
-
-* Offizieller Ersatz für Yahoo (kostenlos/bezahlt) und Prioritäten.
-* Japan/China Daten: welche Reihen sind must-have?
-* Dot Plots / Fed Outlook: Quelle + Extraktionsweg (PDF/HTML parsing) – eigener Adapter.
+Die detaillierte Roadmap, offene Fragen und der aktuelle Backlog werden in [`TODO.md`](TODO.md:1) gepflegt.
+Der aktuelle Projektstatus (Snapshot) findet sich in [`PROJECT_STATUS.md`](PROJECT_STATUS.md:1).

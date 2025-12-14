@@ -4,10 +4,15 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
+import logging
+
 import pandas as pd
+import requests
 import yfinance as yf
 
 from macrolens_poc.retry_utils import RetryConfig, retry_call
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -53,17 +58,50 @@ def fetch_yahoo_history(
             auto_adjust=False,  # Fix FutureWarning; explicit is better than implicit
         )
 
+    def _on_retry(attempt: int, exc: Exception, delay_s: float) -> None:
+        logger.warning(
+            "Retry attempt %d/%d for %s after error: %s. Waiting %.1fs.",
+            attempt,
+            max_attempts,
+            symbol,
+            exc,
+            delay_s,
+        )
+
     def _should_retry(exc: Exception) -> bool:
-        # Don't retry on programming errors or invalid arguments
-        if isinstance(exc, (TypeError, ValueError, KeyError)):
-            return False
-        return True
+        # Transient errors (network, timeout, etc.)
+        if isinstance(
+            exc,
+            (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.ChunkedEncodingError,
+                ConnectionError,
+                TimeoutError,
+            ),
+        ):
+            return True
+
+        # Handle HTTP errors
+        if isinstance(exc, requests.exceptions.HTTPError):
+            # Retry server errors (5xx), fail on client errors (4xx)
+            if exc.response is not None and 400 <= exc.response.status_code < 500:
+                return False
+            return True
+
+        # Generic RequestException (other network issues)
+        if isinstance(exc, requests.exceptions.RequestException):
+            return True
+
+        # Fail fast on everything else (TypeError, ValueError, KeyError, etc.)
+        return False
 
     try:
         df = retry_call(
             _download,
             cfg=RetryConfig(max_attempts=max_attempts, base_delay_s=0.5, max_delay_s=8.0, multiplier=2.0),
             should_retry=_should_retry,
+            on_retry=_on_retry,
         )
     except TypeError as exc:
         # Regression: observed in the wild (TODO/PROJECT_STATUS). Treat as non-fatal provider error.
@@ -85,6 +123,15 @@ def fetch_yahoo_history(
 
     if df is None or df.empty:
         return FetchResult(status="warn", message="yfinance returned 0 rows", data=pd.DataFrame(columns=["date", "value"]))
+
+    # Handle MultiIndex columns (Price, Ticker) - common in newer yfinance
+    if isinstance(df.columns, pd.MultiIndex):
+        try:
+            # Attempt to extract data for the requested symbol
+            if df.columns.nlevels > 1 and symbol in df.columns.get_level_values(1):
+                df = df.xs(symbol, axis=1, level=1)
+        except Exception:
+            pass
 
     # typical columns: Open High Low Close Adj Close Volume
     if "Close" not in df.columns:

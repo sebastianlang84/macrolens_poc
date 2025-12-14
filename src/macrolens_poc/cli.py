@@ -165,7 +165,9 @@ def _persist_matrix_status(
 def run_all(
     ctx: typer.Context,
     lookback_days: int = typer.Option(3650, "--lookback-days", help="How many days to backfill per series"),
-    as_of: Optional[datetime] = typer.Option(None, "--as-of", help="Reference date (YYYY-MM-DD)"),
+    as_of: Optional[datetime] = typer.Option(
+        None, "--as-of", help="Reference date (YYYY-MM-DD). Defaults to UTC today."
+    ),
 ) -> None:
     """Run ingestion for all enabled series."""
 
@@ -234,7 +236,9 @@ def run_one(
     ctx: typer.Context,
     series_id: str = typer.Option(..., "--id", help="Internal series id"),
     lookback_days: int = typer.Option(3650, "--lookback-days", help="How many days to backfill"),
-    as_of: Optional[datetime] = typer.Option(None, "--as-of", help="Reference date (YYYY-MM-DD)"),
+    as_of: Optional[datetime] = typer.Option(
+        None, "--as-of", help="Reference date (YYYY-MM-DD). Defaults to UTC today."
+    ),
 ) -> None:
     """Run ingestion for a single series id."""
 

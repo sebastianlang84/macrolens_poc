@@ -22,6 +22,15 @@
 - [x] Simple Risk Flags (Heuristiken) gem. [`PRD.md`](PRD.md:93)
 - [x] Export: Markdown + JSON (z. B. `reports/report-YYYYMMDD.md` + `.json`)
 
+## Next (M4) — AI Analysis (The "Missing Link")
+
+> Ziel: Den generierten JSON-Report an ein LLM füttern, um den narrativen Report zu erhalten.
+
+- [ ] **Prompt-Engineering**: Template erstellen (System-Prompt "Makro-Stratege" + JSON-Context Injection).
+- [ ] **LLM-Client**: Minimaler Client (z. B. OpenAI API) mit Interface für einfachen Austausch.
+- [ ] **CLI `analyze`**: Neuer Befehl `macrolens-poc analyze`, der Report lädt, LLM fragt und `analysis-YYYYMMDD.md` speichert.
+- [ ] **Config**: API-Keys (z. B. `OPENAI_API_KEY`) in `.env` und Config-Klasse aufnehmen.
+
 ## Backlog (aus Review) — priorisiert, ausführbare Action Items
 
 > Quelle: Repo-Review (siehe Task-Beschreibung). Fokus auf Konsolidierungen, Robustheit/Determinismus, Test-Stabilität, Docs, Tooling.

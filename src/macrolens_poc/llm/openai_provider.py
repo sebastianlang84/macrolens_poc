@@ -16,18 +16,23 @@ class OpenAIProvider(LLMProvider):
         if not self.config.api_key:
             logger.warning("OpenAI API key not provided. LLM calls will fail.")
         
-        self.client = OpenAI(api_key=self.config.api_key)
+        self.client = OpenAI(
+            api_key=self.config.api_key,
+            base_url=self.config.base_url
+        )
 
-    def generate_analysis(self, system_prompt: str, user_prompt: str) -> str:
+    def generate_analysis(self, system_prompt: str, user_prompt: str, model: Optional[str] = None) -> str:
         """
         Generates analysis using OpenAI Chat Completion API with retries.
         """
         if not self.config.api_key:
-             raise ValueError("OpenAI API key is missing. Cannot generate analysis.")
+            raise ValueError("OpenAI API key is missing. Cannot generate analysis.")
+
+        target_model = model or self.config.model
 
         def _call_openai():
             response = self.client.chat.completions.create(
-                model=self.config.model,
+                model=target_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}

@@ -18,9 +18,9 @@ class AnalysisService:
         else:
             self.provider = provider
 
-    def analyze_report(self, report_path: Path) -> str:
+    def analyze_report(self, report_path: Path, override_models: Optional[list[str]] = None) -> str:
         """
-        Loads a JSON report, renders prompts, and requests analysis from the LLM.
+        Loads a JSON report, renders prompts, and requests analysis from the LLM(s).
         Returns the analysis as a Markdown string.
         """
         if not report_path.exists():
@@ -50,8 +50,20 @@ class AnalysisService:
         # Simple string replacement for PoC
         user_prompt = user_prompt_template.replace("{{ report_json }}", report_json_str)
 
-        # 4. Call Provider
-        logger.info(f"Requesting analysis for report: {report_path.name} using model {self.settings.llm.model}")
-        analysis_md = self.provider.generate_analysis(system_prompt, user_prompt)
-        
-        return analysis_md
+        # 4. Call Provider for each model
+        models = override_models if override_models else self.settings.llm.models
+        results = []
+
+        for model in models:
+            logger.info(f"Requesting analysis for report: {report_path.name} using model {model}")
+            try:
+                analysis = self.provider.generate_analysis(system_prompt, user_prompt, model=model)
+                results.append(f"## Analysis ({model})\n\n{analysis}")
+            except Exception as e:
+                logger.error(f"Analysis failed for model {model}: {e}")
+                results.append(f"## Analysis ({model})\n\n*Analysis failed: {e}*")
+
+        if not results:
+             return "*No analysis generated (no models configured or all failed).*"
+
+        return "\n\n---\n\n".join(results)

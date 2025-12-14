@@ -377,11 +377,17 @@ def analyze(
     ctx: typer.Context,
     report_file: Path = typer.Option(..., "--report-file", help="Path to input JSON report"),
     output: Path = typer.Option(..., "--output", help="Path to output Markdown analysis"),
+    models: Optional[str] = typer.Option(
+        None, "--models", help="Comma-separated list of models to use (overrides config)"
+    ),
 ) -> None:
     """Analyze a report using LLM."""
     settings: Settings = ctx.obj["settings"]
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
+
+    override_models = [m.strip() for m in models.split(",") if m.strip()] if models else None
+    effective_models = override_models if override_models else settings.llm.models
 
     logger.log(
         {
@@ -390,13 +396,13 @@ def analyze(
             "run_id": run_ctx.run_id,
             "report_file": str(report_file),
             "output": str(output),
-            "model": settings.llm.model,
+            "models": effective_models,
         }
     )
 
     try:
         service = AnalysisService(settings)
-        analysis_md = service.analyze_report(report_file)
+        analysis_md = service.analyze_report(report_file, override_models=override_models)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(analysis_md, encoding="utf-8")

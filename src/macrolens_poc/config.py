@@ -23,6 +23,12 @@ class LLMConfig(BaseModel):
     # Modell-Auswahl (z.B. gpt-4-turbo, gpt-3.5-turbo)
     model: str = Field(default="gpt-4-turbo")
 
+    # Liste der Modelle für redundante Analyse
+    models: list[str] = Field(default_factory=lambda: ["gpt-4-turbo"])
+
+    # Base URL für OpenAI-kompatible APIs (z.B. OpenRouter, LocalAI)
+    base_url: Optional[str] = Field(default=None)
+
     # Kreativität vs. Determinismus
     temperature: float = Field(default=0.0)
 
@@ -89,6 +95,8 @@ def load_settings(config_path: Optional[Path]) -> Settings:
     env_fred_api_key = _getenv("FRED_API_KEY")
     env_openai_api_key = _getenv("OPENAI_API_KEY")
     env_llm_model = _getenv("LLM_MODEL")
+    env_llm_models = _getenv("LLM_MODELS")
+    env_llm_base_url = _getenv("LLM_BASE_URL") or _getenv("OPENAI_BASE_URL")
 
     if env_data_tz is not None:
         merged["data_tz"] = env_data_tz
@@ -104,6 +112,15 @@ def load_settings(config_path: Optional[Path]) -> Settings:
         merged["llm"]["api_key"] = env_openai_api_key
     if env_llm_model is not None:
         merged["llm"]["model"] = env_llm_model
+    
+    if env_llm_models is not None:
+        merged["llm"]["models"] = [m.strip() for m in env_llm_models.split(",") if m.strip()]
+    elif env_llm_model is not None:
+        # Fallback: sync models list with single model env var if list not explicit
+        merged["llm"]["models"] = [env_llm_model]
+
+    if env_llm_base_url is not None:
+        merged["llm"]["base_url"] = env_llm_base_url
 
     if config_path is not None:
         cfg = _load_yaml(config_path)

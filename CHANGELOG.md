@@ -11,6 +11,8 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 
 ### Added
 - **Feat:** KI-Analyse (`analyze` command) mit OpenAI Integration für Markt-Zusammenfassungen.
+- **Feat:** Multi-Model Support: Analyse mit mehreren Modellen parallel (konfigurierbar via `LLM_MODELS` oder `--models`).
+- **Feat:** OpenRouter Integration: Konfigurierbare `LLM_BASE_URL` ermöglicht Nutzung beliebiger OpenAI-kompatibler APIs.
 - **Feat:** Stale-Series Detection (Warnung bei veralteten Daten basierend auf `frequency`).
 - Pipeline: `last_observation_date` und `run_at` im `SeriesRunResult` und `series_run` Event.
 - Yahoo Source: `timeout_s` Parameter für `fetch_yahoo_history` (Default: 10.0s).

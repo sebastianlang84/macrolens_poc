@@ -119,19 +119,42 @@ Output:
 - Reports unter [`reports/`](reports/.gitkeep:1)
 - Logs weiterhin unter [`logs/`](logs/.gitkeep:1)
 
-## KI-Analyse (OpenAI)
+## KI-Analyse (Multi-Model / OpenRouter)
 
-Der `analyze` Befehl nutzt ein LLM (OpenAI), um die generierten Reports zusammenzufassen und eine Markteinschätzung zu geben.
+Der `analyze` Befehl nutzt ein oder mehrere LLMs, um die generierten Reports zusammenzufassen und eine Markteinschätzung zu geben.
+
+### Features
+
+- **Multi-Model Support:** Analyse mit mehreren Modellen parallel (z. B. für "Second Opinions").
+- **OpenRouter Integration:** Nutzung beliebiger Modelle via OpenAI-kompatibler API (konfigurierbare `base_url`).
+
+### Konfiguration
 
 Voraussetzung:
-- `OPENAI_API_KEY` in `.env` gesetzt.
+- `OPENAI_API_KEY` in `.env` gesetzt (kann auch ein OpenRouter Key sein).
 - Reports wurden zuvor generiert (`macrolens-poc report`).
 
+Optionale Env-Variablen (siehe [`.env.example`](.env.example:1)):
+- `LLM_MODELS`: Kommagetrennte Liste von Modellen (Default: `gpt-4o`).
+- `LLM_BASE_URL`: API-Endpunkt (z. B. `https://openrouter.ai/api/v1` für OpenRouter).
+
+### Usage
+
+Standard-Analyse (mit konfiguriertem Default-Modell):
 ```bash
 macrolens-poc analyze
 ```
 
-Das Ergebnis wird auf der Konsole ausgegeben und (optional) als Markdown gespeichert (Default: stdout).
+Spezifische Modelle (überschreibt Config):
+```bash
+# Einzelnes Modell
+macrolens-poc analyze --models "gpt-4o-mini"
+
+# Mehrere Modelle (Parallel-Abfrage)
+macrolens-poc analyze --models "gpt-4o,claude-3-5-sonnet-20240620"
+```
+
+Das Ergebnis wird auf der Konsole ausgegeben und (optional) als Markdown gespeichert (Default: stdout). Bei mehreren Modellen werden die Analysen im Output konkateniert.
 
 Details zum aktuellen Projektstatus siehe [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1).
 Nächste Arbeitspakete siehe [`TODO.md`](TODO.md:1).

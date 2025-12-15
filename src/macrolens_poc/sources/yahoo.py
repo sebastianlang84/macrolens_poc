@@ -48,14 +48,20 @@ def fetch_yahoo_history(
     """
 
     def _download() -> pd.DataFrame:
-        return yf.download(
-            symbol,
+        # Use a custom session with a browser-like User-Agent to avoid 429s
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        })
+        
+        # Use Ticker.history which allows session injection and is often more robust
+        ticker = yf.Ticker(symbol, session=session)
+        return ticker.history(
             start=start,
             end=end,
             interval=interval,
-            progress=False,
-            timeout=float(timeout_s),
-            auto_adjust=False,  # Fix FutureWarning; explicit is better than implicit
+            auto_adjust=False,
+            timeout=float(timeout_s)
         )
 
     def _on_retry(attempt: int, exc: Exception, delay_s: float) -> None:
@@ -93,7 +99,12 @@ def fetch_yahoo_history(
         if isinstance(exc, requests.exceptions.RequestException):
             return True
 
-        # Fail fast on everything else (TypeError, ValueError, KeyError, etc.)
+        # Explicitly DO NOT retry on TypeError, ValueError, IndexError, KeyError
+        # These are likely data/schema issues (e.g. yfinance API changes)
+        if isinstance(exc, (TypeError, ValueError, IndexError, KeyError)):
+            return False
+
+        # Fail fast on everything else by default to avoid infinite loops on logic errors
         return False
 
     try:
@@ -132,19 +143,75 @@ def fetch_yahoo_history(
                 df = df.xs(symbol, axis=1, level=1)
         except Exception:
             pass
+        
+        # If still MultiIndex, try to flatten or drop levels if possible
+        if isinstance(df.columns, pd.MultiIndex):
+            # If we have a 'Close' in level 0, we might need to select it carefully
+            if "Close" in df.columns.get_level_values(0):
+                # Select all columns where level 0 is Close
+                close_cols = df.xs("Close", axis=1, level=0, drop_level=True)
+                if not close_cols.empty:
+                    # If multiple columns remain (multiple tickers?), pick the first one or the one matching symbol
+                    if symbol in close_cols.columns:
+                        df = close_cols[[symbol]]
+                    else:
+                        df = close_cols.iloc[:, [0]]
+                    # Now df is single-level (Ticker) or Series-like.
+                    # We want to rename it to 'value' later.
+                    df.columns = ["Close"] # Normalize to expected name
 
     # typical columns: Open High Low Close Adj Close Volume
+    # Check if "Close" is in columns (single level)
     if "Close" not in df.columns:
-        return FetchResult(status="error", message="yfinance missing Close column", data=None)
+        return FetchResult(status="error", message=f"yfinance missing Close column. Columns: {df.columns}", data=None)
 
-    out = df[["Close"]].copy()
+    # Extract Close column safely
+    # Ensure we get a DataFrame with single level columns, not a Series, not MultiIndex
+    try:
+        out = df[["Close"]].copy()
+    except Exception:
+        # Fallback for edge cases
+        out = pd.DataFrame(df["Close"].copy())
+        out.columns = ["Close"]
+
+    # Flatten columns if they are still MultiIndex (should not happen if logic above worked, but be safe)
+    if isinstance(out.columns, pd.MultiIndex):
+        out.columns = out.columns.get_level_values(0)
+
     out = out.rename(columns={"Close": "value"})
 
     out = out.reset_index()  # index becomes a column: Date
-    date_col = "Date" if "Date" in out.columns else out.columns[0]
+    
+    # Identify date column
+    if "Date" in out.columns:
+        date_col = "Date"
+    elif "index" in out.columns:
+        date_col = "index"
+    else:
+        date_col = out.columns[0]
+        
     out = out.rename(columns={date_col: "date"})
 
-    out["date"] = pd.to_datetime(out["date"], utc=True)
+    # Ensure date is 1-d array/Series before to_datetime
+    if isinstance(out["date"], pd.DataFrame):
+        # This happens if we have duplicate columns named 'date' or similar mess
+        out = out.loc[:, ~out.columns.duplicated()]
+        if isinstance(out["date"], pd.DataFrame):
+             # Still a DataFrame? Take first column
+             out["date"] = out["date"].iloc[:, 0]
+
+    try:
+        out["date"] = pd.to_datetime(out["date"], utc=True)
+    except Exception as exc:
+        return FetchResult(
+            status="error",
+            message=f"date conversion failed: {exc}",
+            data=None,
+            error_type=type(exc).__name__,
+            error_message=str(exc)
+        )
+
+    out["value"] = pd.to_numeric(out["value"], errors="coerce")
     out = out[["date", "value"]].sort_values("date")
 
     return FetchResult(status="ok", message="ok", data=out)

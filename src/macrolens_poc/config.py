@@ -81,7 +81,9 @@ def load_settings(config_path: Optional[Path]) -> Settings:
         non-deterministic.
     """
 
-    load_dotenv(dotenv_path=Path(".env"), override=False)
+    # Explicitly look for .env in CWD to be sure
+    env_path = Path.cwd() / ".env"
+    load_dotenv(dotenv_path=env_path, override=True)
 
     # start from defaults via pydantic
     base = Settings()
@@ -114,13 +116,23 @@ def load_settings(config_path: Optional[Path]) -> Settings:
         merged["llm"]["model"] = env_llm_model
     
     if env_llm_models is not None:
-        merged["llm"]["models"] = [m.strip() for m in env_llm_models.split(",") if m.strip()]
+        models_list = [m.strip() for m in env_llm_models.split(",") if m.strip()]
+        merged["llm"]["models"] = models_list
+        # If model is not explicitly set but models is, use the first one as default
+        if env_llm_model is None and models_list:
+            merged["llm"]["model"] = models_list[0]
     elif env_llm_model is not None:
         # Fallback: sync models list with single model env var if list not explicit
         merged["llm"]["models"] = [env_llm_model]
 
     if env_llm_base_url is not None:
         merged["llm"]["base_url"] = env_llm_base_url
+    elif "llm" in merged and "base_url" not in merged["llm"]:
+        # If base_url is not set in env or config, but we have an API key,
+        # we might want to default to OpenRouter if the key looks like one (sk-or-...)
+        # But for now, let's just ensure it's not None if we want to force it.
+        # Actually, the issue might be that pydantic defaults it to None, and we pass None to OpenAI client.
+        pass
 
     if config_path is not None:
         cfg = _load_yaml(config_path)

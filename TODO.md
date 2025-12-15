@@ -61,13 +61,14 @@
   - Kontext: `TypeError: arg must be a list, tuple, 1-d array, or Series` in [`src/macrolens_poc/sources/yahoo.py`](src/macrolens_poc/sources/yahoo.py:1)
   - DoD/Output: Unit-Test (Monkeypatch/Stubs) reproduziert den Fehler; Run crasht nicht und liefert `error_type`/`error_message` (vgl. [`tests/test_m2_provider_robustness.py`](tests/test_m2_provider_robustness.py:1)).
 
-- [ ] **Yahoo-Retry härten: transient vs. permanent sauber trennen + Logging der Retry-Metadaten**
+- [x] **Yahoo-Retry härten: transient vs. permanent sauber trennen + Logging der Retry-Metadaten**
   - DoD/Output: Retry greift nur bei transienten Fehlern (Timeout/HTTP/Rate-Limit o. ä.); permanenter „Data/Schema“-Fehler (z. B. TypeError) wird **nicht** endlos retried; `series_run`-Event enthält konsistente `error_type`/`error_message` + Retry-Infos (z. B. `attempts`, `sleep_s`).
 
-- [ ] Decision: **Dependency-Strategie für yfinance**
+- [x] Decision: **Dependency-Strategie für yfinance**
   - Option A: Version pinning/constraints in [`pyproject.toml`](pyproject.toml:1)
   - Option B: separate Constraints-Datei + dokumentierter Install-Flow (z. B. `pip -c constraints.txt`)
   - DoD/Output: Entscheidung + konkretisiertes Folge-Item (Pin/Constraints + Doku/CI) angelegt.
+  - **Entscheidung:** Option A (Version Pinning in `pyproject.toml`).
 
 - [ ] Follow-up (abhängig von Decision): **Warnungen/Breaking Changes absichern** (z. B. `auto_adjust`-FutureWarning)
   - DoD/Output: Unit-Test deckt Verhalten ab; Doku-Hinweis in [`README.md`](README.md:1) falls Nutzer betroffen sind.

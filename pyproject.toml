@@ -14,7 +14,7 @@ dependencies = [
   "requests>=2.32.0",
   "pandas>=2.2.0",
   "pyarrow>=16.0.0",
-  "yfinance>=0.2.40",
+  "yfinance==0.2.50",
   "openai>=1.0.0",
 ]
 

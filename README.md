@@ -96,6 +96,9 @@ Repo-Verzeichnisse sind angelegt (Platzhalter via `.gitkeep`):
 # einzelne Serie (id aus [`config/sources_matrix.yaml`](config/sources_matrix.yaml:1))
 macrolens-poc --config config/config.example.yaml run-one --id us_cpi --lookback-days 3650
 
+# ausgewählte Serien (kommagetrennt)
+macrolens-poc --config config/config.example.yaml run-selected --ids "us_cpi,btc_usd" --lookback-days 3650
+
 # alle enabled Serien
 macrolens-poc --config config/config.example.yaml run-all --lookback-days 3650
 

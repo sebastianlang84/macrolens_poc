@@ -46,8 +46,13 @@ def fetch_fred_series_observations(
     - Provider robustness: retry + exponential backoff on transient failures.
     """
 
-    if api_key is None:
-        return FetchResult(status="missing", message="FRED_API_KEY missing", data=None)
+    if not api_key:
+        # Fallback: try env var directly if not passed
+        import os
+        api_key = os.getenv("FRED_API_KEY")
+
+    if not api_key:
+        return FetchResult(status="missing", message="FRED_API_KEY missing (checked arg and env)", data=None)
 
     url = "https://api.stlouisfed.org/fred/series/observations"
     params: Dict[str, Any] = {

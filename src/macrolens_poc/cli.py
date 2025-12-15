@@ -328,6 +328,112 @@ def run_one(
     logger.log(summary)
 
 
+@app.command("run-selected")
+def run_selected(
+    ctx: typer.Context,
+    series_ids: str = typer.Option(..., "--ids", help="Comma-separated list of series ids"),
+    lookback_days: int = typer.Option(3650, "--lookback-days", help="How many days to backfill"),
+    as_of: Optional[datetime] = typer.Option(
+        None, "--as-of", help="Reference date (YYYY-MM-DD). Defaults to UTC today."
+    ),
+) -> None:
+    """Run ingestion for a selected list of series ids."""
+
+    settings: Settings = ctx.obj["settings"]
+    run_ctx = new_run_context()
+    logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
+
+    # Deterministic run time
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.replace(tzinfo=timezone.utc)
+
+    target_ids = [s.strip() for s in series_ids.split(",") if s.strip()]
+
+    logger.log(
+        {
+            "event": "command_start",
+            "command": "run-selected",
+            "run_id": run_ctx.run_id,
+            "series_ids": target_ids,
+            "data_tz": settings.data_tz,
+            "report_tz": settings.report_tz,
+            "sources_matrix_path": str(settings.sources_matrix_path),
+            "lookback_days": lookback_days,
+            "as_of": run_ts.isoformat(),
+        }
+    )
+
+    matrix_result = load_sources_matrix(settings.sources_matrix_path)
+    
+    # Filter matrix for requested IDs
+    selected_specs = []
+    missing_ids = []
+    
+    # Create a map for faster lookup
+    spec_map = {s.id: s for s in matrix_result.matrix.series}
+    
+    for tid in target_ids:
+        if tid in spec_map:
+            spec = spec_map[tid]
+            if spec.enabled:
+                selected_specs.append(spec)
+            else:
+                logger.log(
+                    {
+                        "event": "series_disabled",
+                        "run_id": run_ctx.run_id,
+                        "series_id": tid,
+                    }
+                )
+        else:
+            missing_ids.append(tid)
+
+    if missing_ids:
+        logger.log(
+            {
+                "event": "series_not_found",
+                "run_id": run_ctx.run_id,
+                "missing_ids": missing_ids,
+                "path": str(matrix_result.path),
+            }
+        )
+        # We continue with the valid ones, but log the missing ones
+
+    if not selected_specs and not missing_ids:
+        # No valid specs found and no missing IDs (empty input?)
+        logger.log({"event": "no_series_selected", "run_id": run_ctx.run_id})
+        raise typer.Exit(code=2)
+
+    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
+    total_new_points = 0
+    results: list[SeriesRunResult] = []
+
+    for spec in selected_specs:
+        result = run_series(
+            settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts
+        )
+        results.append(result)
+        status_counts[result.status] = status_counts.get(result.status, 0) + 1
+        total_new_points += result.new_points
+
+        _record_series_metadata(settings, spec, result)
+        _log_series_run(logger, run_id=run_ctx.run_id, result=result)
+
+    matrix_status_meta = _persist_matrix_status(
+        logger=logger,
+        run_id=run_ctx.run_id,
+        data_dir=settings.paths.data_dir,
+        results=results,
+        as_of=as_of,
+    )
+
+    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
+    summary["total_new_points"] = total_new_points
+    summary.update(matrix_status_meta)
+    logger.log(summary)
+
+
 @app.command()
 def report(
     ctx: typer.Context,

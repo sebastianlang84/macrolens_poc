@@ -99,6 +99,28 @@ series:
     notes: "10Y minus 2Y Treasury spread (FRED T10Y2Y)"
     enabled: true
 
+  - id: us_hy_spread
+    provider: fred
+    provider_symbol: BAMLH0A0HYM2
+    category: risk_assets
+    frequency_target: daily
+    timezone: UTC
+    units: percent
+    transform: none
+    notes: "ICE BofA US High Yield Index Option-Adjusted Spread (FRED BAMLH0A0HYM2)"
+    enabled: true
+
+  - id: us_indpro
+    provider: fred
+    provider_symbol: INDPRO
+    category: macro_us
+    frequency_target: daily
+    timezone: UTC
+    units: index
+    transform: none
+    notes: "Industrial Production: Total Index (FRED INDPRO) - Monthly, proxy for activity"
+    enabled: true
+
   - id: oil_wti
     provider: fred
     provider_symbol: DCOILWTICO
@@ -111,14 +133,14 @@ series:
     enabled: true
 
   - id: gold_usd
-    provider: fred
-    provider_symbol: GOLDAMGBD228NLBM
+    provider: yfinance
+    provider_symbol: GC=F
     category: commodities
     frequency_target: daily
     timezone: UTC
     units: usd
     transform: none
-    notes: "Gold Fixing Price 10:30 A.M. (London) (FRED GOLDAMGBD228NLBM)"
+    notes: "Gold Futures (Yahoo GC=F)"
     enabled: true
 
   # --- Yahoo Finance (markets/crypto) ---

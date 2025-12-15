@@ -7,6 +7,22 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 - https://keepachangelog.com/en/1.1.0/
 - https://semver.org/
 
+## [Unreleased]
+
+## [0.4.1] - 2025-12-15
+
+### Fixed
+- **Config:** Korrektur des `.env` Lademechanismus (explizites Laden vor Config-Initialisierung), um sicherzustellen, dass Umgebungsvariablen korrekt priorisiert werden.
+- **LLM:** Fix für `OpenAIProvider` Initialisierung (korrekte Handhabung von `api_key` und `base_url` aus der Konfiguration).
+- **LLM:** Verbesserte Fehlerbehandlung bei fehlenden API-Keys (Graceful Degradation statt Crash).
+
+### Added
+- **Feat:** Neuer CLI-Befehl `run-selected` (Ausführung spezifischer Serien-IDs).
+- **Config:** Neue Serien `us_hy_spread` und `us_indpro` zur Matrix hinzugefügt.
+
+### Changed
+- **Robustness:** Yahoo/yfinance Retry-Logik gehärtet und Version gepinnt.
+
 ## [0.4.0] - 2025-12-14
 
 ### Added

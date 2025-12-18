@@ -22,12 +22,12 @@ class SeriesRunResult:
     message: str
     stored_path: Optional[Path]
     new_points: int
+    last_observation_date: Optional[date]
+    run_at: datetime
     revision_overwrites_count: int = 0
     revision_overwrites_sample: Optional[list[dict]] = None
     error_type: Optional[str] = None
     error_message: Optional[str] = None
-    last_observation_date: Optional[date] = None
-    run_at: Optional[datetime] = None
 
 
 def _normalize_timeseries(df: pd.DataFrame) -> pd.DataFrame:
@@ -67,10 +67,9 @@ def run_series(
     """
 
     # Strict TZ determinism: use as_of or UTC now
-    if as_of is not None:
-        run_ts = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=timezone.utc)
-    else:
-        run_ts = datetime.now(timezone.utc)
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    if run_ts.tzinfo is None:
+        run_ts = run_ts.replace(tzinfo=timezone.utc)
 
     ref_date = run_ts.date()
     observation_start = ref_date - timedelta(days=lookback_days)
@@ -91,6 +90,8 @@ def run_series(
                 message="provider fetch failed",
                 stored_path=None,
                 new_points=0,
+                last_observation_date=None,
+                run_at=run_ts,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
             )
@@ -110,6 +111,8 @@ def run_series(
                 message="provider fetch failed",
                 stored_path=None,
                 new_points=0,
+                last_observation_date=None,
+                run_at=run_ts,
                 error_type=type(exc).__name__,
                 error_message=str(exc),
             )
@@ -182,6 +185,8 @@ def run_series(
             message=f"store failed: {exc}",
             stored_path=out_path,
             new_points=0,
+            last_observation_date=None,
+            run_at=run_ts,
             error_type=type(exc).__name__,
             error_message=str(exc),
         )
@@ -193,7 +198,7 @@ def run_series(
 
     # Staleness check
     status = fetched.status
-    message = "ok"
+    message = "ok" if status == "ok" else fetched.message
 
     if status == "ok" and last_observation_date is not None:
         threshold = spec.stale_days if spec.stale_days is not None else settings.stale_days_default
@@ -201,7 +206,6 @@ def run_series(
         if delta_days > threshold:
             status = "warn"
             message = f"stale: last data {delta_days} days ago (threshold: {threshold})"
-
     return SeriesRunResult(
         series_id=spec.id,
         provider=spec.provider,
@@ -209,8 +213,8 @@ def run_series(
         message=message,
         stored_path=store_result.path,
         new_points=store_result.new_points,
-        revision_overwrites_count=store_result.revision_overwrites_count,
-        revision_overwrites_sample=store_result.revision_overwrites_sample,
         last_observation_date=last_observation_date,
         run_at=run_ts,
+        revision_overwrites_count=store_result.revision_overwrites_count,
+        revision_overwrites_sample=store_result.revision_overwrites_sample,
     )

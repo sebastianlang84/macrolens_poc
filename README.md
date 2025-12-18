@@ -67,6 +67,17 @@ Nach `python3 -m pip install -e '.[dev]'` stehen Targets in [`Makefile`](Makefil
 
 *Hinweis: `analyze` ist aktuell nur direkt über das CLI verfügbar (siehe unten).*
 
+Optional: `justfile` bietet äquivalente Shortcuts:
+
+```bash
+just run_all
+just run_one us_cpi 180
+just report
+just lint
+just format
+just smoke
+```
+
 ## Konfiguration
 
 Konfiguration ist bewusst lokal gehalten (keine Secrets in Git). Vorlagen im Repo:
@@ -131,7 +142,8 @@ data/
 ├── metadata.sqlite       # Metadaten & Status
 └── matrix_status.json    # Snapshot
 reports/
-└── report_20251215.md    # Generierter Markdown-Report
+├── report_20251215.md     # Generierter Markdown-Report
+└── report_20251215.json   # Generierter JSON-Report
 ```
 
 ### Data Contract (Parquet)

@@ -51,7 +51,6 @@ def test_fetch_fred_retries_on_timeout(monkeypatch) -> None:
 
 def test_fetch_fred_timeout_exhausted(monkeypatch) -> None:
     monkeypatch.setattr(fred.retry_call.__globals__["time"], "sleep", lambda *_: None)
-
     def _always_timeout(*_, **__):
         raise requests.Timeout("hard timeout")
 
@@ -67,7 +66,8 @@ def test_fetch_fred_timeout_exhausted(monkeypatch) -> None:
     )
 
     assert result.status == "error"
-    assert "Timeout" in result.message or "request failed" in result.message
+    assert result.error_type == "Timeout"
+    assert "hard timeout" in (result.error_message or "")
 
 
 def test_fetch_yahoo_retries_download(monkeypatch) -> None:
@@ -128,4 +128,5 @@ def test_fetch_yahoo_timeout_exhausted(monkeypatch) -> None:
     )
 
     assert result.status == "error"
-    assert "Timeout" in result.message or "download failed" in result.message
+    assert result.error_type == "Timeout"
+    assert "download timeout" in (result.error_message or "")

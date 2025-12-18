@@ -26,6 +26,7 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ## 2) Projekt-Kontext & Links
 
+- Ziel: lokaler Python-PoC für Makro-/Marktdaten-Ingestion, Normalisierung, Storage und Report-Generierung.
 - **Primary Entry Point**: [`README.md`](README.md:1) (Quickstart, Installation, Usage).
 - **Requirements**: [`docs/PRD.md`](docs/PRD.md:1).
 - **Status**: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1).

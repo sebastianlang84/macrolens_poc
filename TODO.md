@@ -41,7 +41,7 @@
   - Option A: Canonical = [`src/macrolens_poc/report/v1.py`](src/macrolens_poc/report/v1.py:1); [`src/macrolens_poc/report/generate.py`](src/macrolens_poc/report/generate.py:1) wird Thin-Wrapper/Weiterleitung oder entfernt
   - Option B: Canonical = [`src/macrolens_poc/report/generate.py`](src/macrolens_poc/report/generate.py:1); [`src/macrolens_poc/report/v1.py`](src/macrolens_poc/report/v1.py:1) wird Thin-Wrapper/Weiterleitung oder entfernt
   - DoD/Output: Entscheidung (inkl. 1–2 Bulletpoints „warum“) in [`TODO.md`](TODO.md:1) festgehalten + **ein** klarer Entry Point benannt (Importpfad/CLI-Aufruf).
-  - **Entscheidung:** Option A (v1.py). `generate.py` wurde entfernt.
+  - **Entscheidung:** Option A (v1.py). `generate.py` bleibt vorerst als Backwards-Compat/Legacy erhalten (Consolidation später).
 
 - [x] Follow-up (abhängig von Decision): **Report-Duplikat entfernen + Tests auf *einen* Codepfad umstellen**
   - DoD/Output: genau *ein* Codepfad erzeugt Report-Artefakte; Tests decken *diesen* Pfad ab (mind. [`tests/test_report_generate.py`](tests/test_report_generate.py:1) und die v1-Tests wie [`tests/test_m3_report_v1_deltas.py`](tests/test_m3_report_v1_deltas.py:1), [`tests/test_m3_report_v1_risk_flags.py`](tests/test_m3_report_v1_risk_flags.py:1)).
@@ -50,7 +50,7 @@
   - Option A: primär [`Makefile`](Makefile:1), [`justfile`](justfile:1) wird Thin-Wrapper oder entfernt
   - Option B: primär [`justfile`](justfile:1), [`Makefile`](Makefile:1) wird Thin-Wrapper oder entfernt
   - DoD/Output: Entscheidung (inkl. DX/Portabilität) in [`TODO.md`](TODO.md:1) festgehalten.
-  - **Entscheidung:** Option A (Makefile). `justfile` wurde entfernt.
+  - **Entscheidung:** Option A (Makefile). `justfile` bleibt optional als Wrapper.
 
 - [x] Follow-up (abhängig von Decision): **Targets/Recipes konsolidieren (1:1 Mapping)**
   - DoD/Output: einheitliche Befehle existieren (mind. `run_all`, `run_one`, `report`, `test`, `lint`, `format`); Referenz in [`README.md`](README.md:1) passt zum gewählten Runner.

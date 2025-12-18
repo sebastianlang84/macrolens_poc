@@ -27,10 +27,8 @@ from macrolens_poc.sources.matrix_status import (
 )
 from macrolens_poc.storage.metadata_db import (
     SeriesMetadataRecord,
-    upsert_series_metadata,
-)
-from macrolens_poc.storage.metadata_db import (
     init_db as init_metadata_db,
+    upsert_series_metadata,
 )
 
 app = typer.Typer(add_completion=False, help="macrolens_poc CLI (Milestone M4 POC)")
@@ -43,7 +41,9 @@ def _ensure_dirs(settings: Settings) -> None:
     init_metadata_db(settings.paths.metadata_db)
 
 
-def _record_series_metadata(settings: Settings, spec: SeriesSpec, result: SeriesRunResult) -> None:
+def _record_series_metadata(
+    settings: Settings, spec: SeriesSpec, result: SeriesRunResult
+) -> None:
     metadata_record = SeriesMetadataRecord(
         series_id=spec.id,
         provider=spec.provider,

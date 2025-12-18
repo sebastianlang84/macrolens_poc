@@ -34,7 +34,7 @@ def fetch_yahoo_history(
 ) -> FetchResult:
     """Fetch historical daily prices from Yahoo Finance via yfinance.
 
-    Uses [`yfinance.download()`](/ranaroussi/yfinance:download) under the hood.
+    Uses `yfinance.Ticker(...).history()` under the hood.
 
     Returns a DataFrame with columns:
       - date (timezone-aware UTC Timestamp)

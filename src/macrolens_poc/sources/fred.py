@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -67,7 +67,9 @@ def fetch_fred_series_observations(
         "sort_order": "asc",
     }
     if observation_start is not None:
-        params["observation_start"] = observation_start.isoformat()
+        # Lookback buffer: ensure we have enough history for downstream delta windows.
+        buffered_start = observation_start - timedelta(days=90)
+        params["observation_start"] = buffered_start.isoformat()
     if observation_end is not None:
         params["observation_end"] = observation_end.isoformat()
 
@@ -105,6 +107,8 @@ def fetch_fred_series_observations(
             status="error",
             message=f"FRED request failed: {type(exc).__name__}: {exc}",
             data=None,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
         )
 
     if resp.status_code == 404:
@@ -113,11 +117,23 @@ def fetch_fred_series_observations(
     try:
         payload = resp.json()
     except ValueError as exc:
-        return FetchResult(status="error", message=f"FRED invalid JSON: {exc}", data=None)
+        return FetchResult(
+            status="error",
+            message=f"FRED invalid JSON: {exc}",
+            data=None,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
 
     observations = payload.get("observations")
     if not isinstance(observations, list):
-        return FetchResult(status="error", message="FRED response missing observations list", data=None)
+        return FetchResult(
+            status="error",
+            message="FRED response missing observations list",
+            data=None,
+            error_type="InvalidResponseError",
+            error_message="observations is not a list",
+        )
 
     if not observations:
         return FetchResult(

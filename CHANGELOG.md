@@ -17,6 +17,7 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 - **LLM:** Konzept für Multi-Model Redundanz (OpenAI + Gemini) ausgearbeitet.
 - **Tests:** Regression-Test für die Sources-Matrix ([`tests/test_matrix_regression.py`](tests/test_matrix_regression.py:1)) hinzugefügt.
 - **Tests:** Unit-Tests für Stale-Detection Logik in `tests/test_stale_detection.py`.
+- **Report:** Legacy Report-Generator in [`src/macrolens_poc/report/generate.py`](src/macrolens_poc/report/generate.py:1) (Backwards-Compat).
 
 ### Changed
 - **Docs:** Dokumentation bereinigt und konsolidiert (Deduplizierung README/AGENTS/PRD).

@@ -51,9 +51,9 @@ def _revision_overwrite_sample(df: pd.DataFrame) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in df.itertuples(index=False):
         # row: date, value_old, value_new
-        dt: pd.Timestamp = getattr(row, "date")
-        old = getattr(row, "value_old")
-        new = getattr(row, "value_new")
+        dt: pd.Timestamp = row.date
+        old = row.value_old
+        new = row.value_new
         out.append(
             {
                 "date": dt.tz_convert("UTC").strftime("%Y-%m-%d"),
@@ -130,9 +130,7 @@ def merge_series(
     combined = pd.concat([ex, inc], ignore_index=True)
     merged = combined.drop_duplicates(subset=["date"], keep="last").sort_values("date")
 
-    merged_dates_ns = set(
-        merged["date"].dt.tz_convert("UTC").dt.tz_localize(None).astype("int64").tolist()
-    )
+    merged_dates_ns = set(merged["date"].dt.tz_convert("UTC").dt.tz_localize(None).astype("int64").tolist())
     new_points = len(merged_dates_ns - ex_dates_ns)
 
     return merged, new_points, revision_overwrites_count, revision_overwrites_sample
@@ -146,7 +144,9 @@ def store_series(path: Path, incoming: pd.DataFrame) -> StoreResult:
     existing = load_series(path)
     rows_before = 0 if existing is None else len(existing)
 
-    merged, new_points, revision_overwrites_count, revision_overwrites_sample = merge_series(existing, incoming)
+    merged, new_points, revision_overwrites_count, revision_overwrites_sample = merge_series(
+        existing, incoming
+    )
     rows_after = len(merged)
 
     merged.to_parquet(path, index=False)

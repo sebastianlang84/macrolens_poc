@@ -100,8 +100,8 @@ def _series_last_and_deltas(
     # map UTC date -> last value for that day
     by_day: dict[datetime.date, float] = {}
     for row in non_nan.itertuples(index=False):
-        ts: pd.Timestamp = pd.Timestamp(getattr(row, "date")).tz_convert("UTC")
-        v = getattr(row, "value")
+        ts: pd.Timestamp = pd.Timestamp(row.date).tz_convert("UTC")
+        v = row.value
         if pd.isna(v):
             continue
         by_day[ts.date()] = float(v)
@@ -168,7 +168,7 @@ def render_report_markdown(report: ReportV1) -> str:
         d1 = row.deltas.get("d1")
         d5 = row.deltas.get("d5")
         d21 = row.deltas.get("d21")
-        
+
         status_str = row.status
         if row.status != "ok" and row.status_message:
             status_str += f" ({row.status_message})"
@@ -214,7 +214,9 @@ def write_report_files(*, report: ReportV1, reports_dir: Path) -> tuple[Path, Pa
         "table": [asdict(r) for r in report.table],
         "risk_flags": report.risk_flags,
     }
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+    )
 
     return md_path, json_path
 
@@ -245,7 +247,7 @@ def generate_report_v1(*, settings: Settings, as_of: Optional[datetime] = None) 
         df = load_series(p)
 
         last, deltas = _series_last_and_deltas(df, windows_days=[1, 5, 21])
-        
+
         # Get status info
         st_entry = status_map.get(spec.id)
         status = st_entry.status if st_entry else "unknown"

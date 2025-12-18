@@ -67,47 +67,44 @@ Use-Cases:
 Eine Tabelle/Datei (YAML/CSV/JSON), die jede Serie beschreibt:
 
 * `id` (intern)
-* `provider` (fred, yfinance, …)
+* `provider` (fred, yfinance)
 * `provider_symbol` (z. B. FRED series id, Yahoo ticker)
 * `category`
-* `frequency_target` (daily)
-* `timezone`
-* `units` (%, index, USD, …)
+* `frequency_target` (Default: daily)
+* `stale_days` (optionaler Override für Staleness-Check)
+* `timezone` (Default: UTC)
+* `units`
 * `transform` (none, pct_change, log, …)
 * `notes`
-* `enabled`
+* `enabled` (Default: true)
 * `last_ok` (wird vom System gepflegt)
 * `status` (ok/warn/error/missing)
 
 ### 6.3 Kernfunktionen
 
 * **Ingestion** (Abholen): pro Provider ein Adapter.
+  * EOD ist provider-abhängig.
+  * Storage erfolgt in UTC; Reporting-TZ wird separat berechnet.
 * **Normalize**: Datum, Zeitzone, NaNs, Dedupe, Sort.
+  * **Data Contract**: Siehe aktuelle Definition in [`README.md`](../README.md:137).
 * **Store**: Append-only Zeitreihe pro Serie.
+  * **Idempotenz & Revisions**: Upsert pro (date, series_id) ist NUR bei Revisionen erlaubt.
+  * Jede Änderung erzeugt ein `revision_log` Event.
 * **Detect & Log**:
-
-  * Missing series.
-  * Leere Antwort.
-  * Provider Fehler.
-  * „Stale data“ (seit N Tagen unverändert).
+  * **Standard Error Codes**: `MISSING_SERIES`, `EMPTY_RESPONSE`, `RATE_LIMIT`, `NETWORK_TIMEOUT`, `PARSE_ERROR`.
+  * **Stale Detection**: Thresholds quantifiziert (z. B. Markets: 3–5 Tage; Macro: frequenzabhängig, z. B. Monthly -> 45 Tage).
 * **Report v1**:
-
-  * Tabelle: letzter Wert, Δ1d/Δ5d/Δ21d.
+  * **Split Logic**:
+    * Markets: Deltas (Δ1d/Δ5d/Δ21d).
+    * Macro: Release Deltas (MoM/YoY).
+  * **Transform Specs**: Nutzung von `transform_params` (z. B. window=21) und `value_type` (level/return/spread).
   * Flags: Risk-On/Off Heuristiken (simple Regeln).
   * Export: Markdown + JSON.
 
 ## 7) Architektur (PoC)
 
-### 7.1 Komponenten
-
-* `config/` (API Keys, Pfade, Matrix)
-* `sources/` (Provider-Adapter)
-* `pipeline/` (fetch → normalize → store → validate)
-* `storage/` (Parquet/CSV/SQLite)
-* `report/` (aggregieren, deltas, output)
-* `logs/` (structured logs + run summary)
-
-### 7.2 Ablauf
+Die Architektur folgt einem modularen Pipeline-Prinzip (Fetch → Normalize → Store → Report).
+Details zu Verzeichnissen und Output-Strukturen finden sich in der [`README.md`](../README.md:115).
 
 ```mermaid
 flowchart LR
@@ -132,7 +129,7 @@ FR6: Report wird als `report.md` + `report.json` erzeugt.
 
 ### 8.2 Non-Functional Requirements
 
-NFR1: Reproduzierbar (lockfile, requirements).
+NFR1: Reproduzierbar (Lockfile tool: `uv.lock` oder `requirements.txt` + `pip-tools`).
 NFR2: Deterministische Outputs bei gleichem Input.
 NFR3: Robust gegen API-Ausfälle (Retries, Timeouts, Backoff).
 NFR4: Logging strukturiert (JSON logs).
@@ -142,7 +139,7 @@ NFR5: Keine Secrets in Git.
 
 * Revisionsdaten (v. a. FRED) können rückwirkend ändern.
 
-  * PoC: „overwrite per date“ zulassen, aber revision loggen.
+  * PoC: Upsert pro (date, series_id) nur bei Revisionen zulassen; jede Änderung erzeugt `revision_log` Event.
 * Unterschiedliche Handelskalender.
 
   * PoC: Daily index, fehlende Tage als NaN, Deltas nur auf verfügbare Punkte.
@@ -157,10 +154,13 @@ NFR5: Keine Secrets in Git.
   * `data/` mit mind. 15 Serien, jeweils > 2 Jahre Historie (wo verfügbar).
   * `logs/run-YYYYMMDD.jsonl`.
   * `reports/report-YYYYMMDD.md` und `.json`.
+  * **Matrix-Status-Snapshot** ist nach Run aktualisiert.
 * Ein zweiter Lauf am selben Tag:
 
   * schreibt keine Duplikate.
   * zeigt im Summary „0 neue Punkte“ oder nur die echten Updates.
+* Report-Check:
+  * Report enthält keine Delta-Werte basierend auf NaN/missing points.
 * Wenn eine Serie nicht mehr verfügbar ist:
 
   * Status `missing`.

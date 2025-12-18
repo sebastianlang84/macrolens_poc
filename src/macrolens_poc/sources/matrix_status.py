@@ -3,14 +3,13 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, Literal, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Literal, Optional
 
 from pydantic import BaseModel, Field, ValidationError
 
 from macrolens_poc.pipeline.run_series import SeriesRunResult
-
 
 MatrixStatus = Literal["ok", "warn", "error", "missing"]
 
@@ -23,6 +22,7 @@ class SeriesStatusEntry(BaseModel):
     # - last_run_at is updated on every run for affected series
     last_ok: Optional[str] = Field(default=None)
     last_run_at: Optional[str] = Field(default=None)
+    last_observation_date: Optional[str] = Field(default=None)
 
     # Optional last error / warning message (cleared on ok).
     last_error: Optional[str] = Field(default=None)
@@ -102,7 +102,9 @@ def merge_matrix_status(
 
         prev_dump = prev.model_dump(mode="python") if prev is not None else None
 
-        next_entry = prev.model_copy(deep=True) if prev is not None else SeriesStatusEntry(status=result.status)  # type: ignore[arg-type]
+        next_entry = (
+            prev.model_copy(deep=True) if prev is not None else SeriesStatusEntry(status=result.status)
+        )  # type: ignore[arg-type]
         next_entry.status = result.status  # type: ignore[assignment]
         next_entry.last_run_at = run_at_iso
 
@@ -144,3 +146,39 @@ def save_matrix_status(path: Path, status_file: MatrixStatusFile) -> None:
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     tmp_path.write_text(content, encoding="utf-8")
     os.replace(tmp_path, path)
+
+
+def identify_stale_series(
+    *,
+    status_file: MatrixStatusFile,
+    ref_date: date,
+    default_threshold: int = 7,
+    overrides: Optional[Dict[str, int]] = None,
+) -> List[Dict[str, Any]]:
+    """Identify series that haven't seen new data for a while.
+
+    Returns a list of dicts with details about stale series.
+    """
+    stale = []
+    overrides = overrides or {}
+
+    for series_id, entry in status_file.series.items():
+        if not entry.last_observation_date:
+            continue
+
+        threshold = overrides.get(series_id, default_threshold)
+        last_obs = date.fromisoformat(entry.last_observation_date)
+        delta = (ref_date - last_obs).days
+
+        if delta > threshold:
+            stale.append(
+                {
+                    "series_id": series_id,
+                    "last_observation_date": last_obs,
+                    "delta_days": delta,
+                    "threshold": threshold,
+                    "status": entry.status,
+                }
+            )
+
+    return sorted(stale, key=lambda x: x["delta_days"], reverse=True)

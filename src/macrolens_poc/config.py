@@ -32,6 +32,13 @@ class LLMConfig(BaseModel):
     # Kreativität vs. Determinismus
     temperature: float = Field(default=0.0)
 
+    # Maximale Anzahl an Tokens für die Antwort
+    max_tokens: Optional[int] = Field(default=None)
+
+    # Reasoning Effort (für Modelle wie o1/o3/gpt-5.1)
+    # Werte: low, medium, high
+    reasoning_effort: Optional[str] = Field(default=None)
+
 
 class Settings(BaseModel):
     """Application settings.
@@ -114,7 +121,7 @@ def load_settings(config_path: Optional[Path]) -> Settings:
         merged["llm"]["api_key"] = env_openai_api_key
     if env_llm_model is not None:
         merged["llm"]["model"] = env_llm_model
-    
+
     if env_llm_models is not None:
         models_list = [m.strip() for m in env_llm_models.split(",") if m.strip()]
         merged["llm"]["models"] = models_list
@@ -168,11 +175,7 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(base)
     for k, v in override.items():
-        if (
-            k in out
-            and isinstance(out[k], dict)
-            and isinstance(v, dict)
-        ):
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
             out[k] = _deep_merge(out[k], v)
         else:
             out[k] = v

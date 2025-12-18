@@ -66,9 +66,11 @@ def run_series(
     as_of overrides the reference date/time (default: UTC now).
     """
 
-    run_ts = as_of if as_of else datetime.now(timezone.utc)
-    if run_ts.tzinfo is None:
-        run_ts = run_ts.replace(tzinfo=timezone.utc)
+    # Strict TZ determinism: use as_of or UTC now
+    if as_of is not None:
+        run_ts = as_of if as_of.tzinfo is not None else as_of.replace(tzinfo=timezone.utc)
+    else:
+        run_ts = datetime.now(timezone.utc)
 
     ref_date = run_ts.date()
     observation_start = ref_date - timedelta(days=lookback_days)

@@ -57,6 +57,7 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ### 3.5 Code-/DX-Standards
 
+- **Tooling**: Wir nutzen **Ruff** als kombiniertes Tool für Linting (`ruff check`) und Formatting (`ruff format`). Dies ersetzt Black und Flake8.
 - Bevorzugt: klarer Modul-Schnitt (config/sources/pipeline/storage/report) analog [`docs/PRD.md`](docs/PRD.md:99).
 - Minimal-Tests für kritische Logik (z. B. Matrix-Loader, Storage-Merge).
 - CLI-Kommandos sollen dokumentiert und stabil sein (help-Text, deterministisches Verhalten).
@@ -90,6 +91,7 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
   - Betriebssystem / Shell
   - Laufzeitumgebung (z. B. `python` vs `python3`, Version)
   - Paketmanager/Tools (z. B. `pip`, `pytest`, `poetry`, `uv`, `conda`) und ob sie verfügbar sind
+  - **Virtuelle Umgebung**: Immer explizit nach `.venv/` oder `venv/` suchen (`ls -d .*/`). Falls vorhanden, den Interpreter daraus direkt ansprechen (z. B. `./.venv/bin/python`).
   - ggf. aktive Terminals/Running Processes (Dev-Server, Jobs)
 - **Terminal-Kommandos**: Immer kurz erklären, was der Befehl macht und warum er nötig ist.
 - **Context7 nutzen**: Bei Bibliotheks-/Framework-Fragen (APIs, Signaturen, Verhalten) zuerst Context7 verwenden, statt zu raten.
@@ -109,25 +111,20 @@ Quelle/Referenz (Pattern): [`../llmstack/AGENTS.md`](../llmstack/AGENTS.md:1)
 
 ## 6) Quickstart / Smoke-Checklist (lokal)
 
-Siehe [`README.md`](README.md:5) für detaillierte Installationsanweisungen.
+Siehe [`README.md`](README.md:16) für detaillierte Installationsanweisungen.
 
 **Minimal Smoke-Check vor Commit:**
-
-1.  **Environment**: `source .venv/bin/activate`
-2.  **CLI Help**: `macrolens-poc --help`
-3.  **Tests**: `python -m pytest`
-4.  **Docs**: `README.md`, `CHANGELOG.md` aktuell?
+1. `macrolens-poc --help` (CLI Entry Point)
+2. `python -m pytest` (Tests)
+3. Dokumentation aktuell? ([`README.md`](README.md:1), [`CHANGELOG.md`](CHANGELOG.md:1), [`TODO.md`](TODO.md:1))
 
 ---
 
 ## 7) Artefakte & Repo-Sauberkeit
 
 - Laufzeit-Artefakte (Outputs) werden **nicht** committet.
-- Standard-Orte (konfigurierbar via [`config/config.example.yaml`](config/config.example.yaml:16)):
-  - Daten: [`data/`](data/.gitkeep:1) (z. B. `data/series/*.parquet`)
-  - Logs: [`logs/`](logs/.gitkeep:1) (z. B. `logs/run-YYYYMMDD.jsonl`)
-  - Reports: [`reports/`](reports/.gitkeep:1) (z. B. `reports/*.md`, `reports/*.json`)
-- Wenn neue Artefakt-Typen entstehen: Pfad/Pattern dokumentieren und `.gitignore` aktualisieren (keine stillen Overwrites).
+- Standard-Orte siehe [`README.md`](README.md:115) (Abschnitt "Output-Pfade").
+- Wenn neue Artefakt-Typen entstehen: Pfad/Pattern dokumentieren und [`.gitignore`](.gitignore:1) aktualisieren.
 
 ---
 

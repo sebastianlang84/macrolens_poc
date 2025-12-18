@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
-
-import logging
 
 import pandas as pd
 import requests
@@ -48,20 +47,25 @@ def fetch_yahoo_history(
     """
 
     def _download() -> pd.DataFrame:
-        # Use a custom session with a browser-like User-Agent to avoid 429s
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        })
-        
-        # Use Ticker.history which allows session injection and is often more robust
-        ticker = yf.Ticker(symbol, session=session)
+        # Use Ticker.history which is often more robust.
+        # Note: We do NOT inject a custom session anymore, as newer yfinance versions (>=0.2.66)
+        # use curl_cffi internally to handle TLS fingerprinting and avoid 429s.
+        # Injecting a standard requests.Session breaks this mechanism.
+        ticker = yf.Ticker(symbol)
+
+        # Ensure start/end are strings to avoid potential type issues in yfinance/pandas
+        # some versions of yfinance/pandas have issues with date objects in certain contexts
+        s_str = start.strftime("%Y-%m-%d") if start else None
+        e_str = end.strftime("%Y-%m-%d") if end else None
+
         return ticker.history(
-            start=start,
-            end=end,
+            start=s_str,
+            end=e_str,
             interval=interval,
-            auto_adjust=False,
-            timeout=float(timeout_s)
+            auto_adjust=False,  # Explicitly set to suppress FutureWarnings
+            back_adjust=False,
+            actions=False,  # We only need prices
+            timeout=float(timeout_s),
         )
 
     def _on_retry(attempt: int, exc: Exception, delay_s: float) -> None:
@@ -133,7 +137,9 @@ def fetch_yahoo_history(
         )
 
     if df is None or df.empty:
-        return FetchResult(status="warn", message="yfinance returned 0 rows", data=pd.DataFrame(columns=["date", "value"]))
+        return FetchResult(
+            status="warn", message="yfinance returned 0 rows", data=pd.DataFrame(columns=["date", "value"])
+        )
 
     # Handle MultiIndex columns (Price, Ticker) - common in newer yfinance
     if isinstance(df.columns, pd.MultiIndex):
@@ -143,7 +149,7 @@ def fetch_yahoo_history(
                 df = df.xs(symbol, axis=1, level=1)
         except Exception:
             pass
-        
+
         # If still MultiIndex, try to flatten or drop levels if possible
         if isinstance(df.columns, pd.MultiIndex):
             # If we have a 'Close' in level 0, we might need to select it carefully
@@ -151,27 +157,40 @@ def fetch_yahoo_history(
                 # Select all columns where level 0 is Close
                 close_cols = df.xs("Close", axis=1, level=0, drop_level=True)
                 if not close_cols.empty:
-                    # If multiple columns remain (multiple tickers?), pick the first one or the one matching symbol
+                    # If multiple columns remain (multiple tickers?), pick the first one
+                    # or the one matching symbol
                     if symbol in close_cols.columns:
                         df = close_cols[[symbol]]
                     else:
                         df = close_cols.iloc[:, [0]]
                     # Now df is single-level (Ticker) or Series-like.
                     # We want to rename it to 'value' later.
-                    df.columns = ["Close"] # Normalize to expected name
+                    df.columns = ["Close"]  # Normalize to expected name
 
     # typical columns: Open High Low Close Adj Close Volume
     # Check if "Close" is in columns (single level)
     if "Close" not in df.columns:
-        return FetchResult(status="error", message=f"yfinance missing Close column. Columns: {df.columns}", data=None)
+        # If we have 'Adj Close' but no 'Close', use that as fallback
+        if "Adj Close" in df.columns:
+            df = df.rename(columns={"Adj Close": "Close"})
+        else:
+            return FetchResult(
+                status="error",
+                message=f"yfinance missing Close column. Columns: {list(df.columns)}",
+                data=None,
+                error_type="ColumnNotFoundError",
+                error_message=f"Required column 'Close' not found in {list(df.columns)}",
+            )
 
     # Extract Close column safely
     # Ensure we get a DataFrame with single level columns, not a Series, not MultiIndex
     try:
-        out = df[["Close"]].copy()
-    except Exception:
-        # Fallback for edge cases
-        out = pd.DataFrame(df["Close"].copy())
+        # Use .loc to be explicit and avoid SettingWithCopy issues
+        out = df.loc[:, ["Close"]].copy()
+    except Exception as exc:
+        # Fallback for edge cases (e.g. if Close is a Series for some reason)
+        logger.debug("Fallback extraction for Close column due to: %s", exc)
+        out = pd.DataFrame(df["Close"]).copy()
         out.columns = ["Close"]
 
     # Flatten columns if they are still MultiIndex (should not happen if logic above worked, but be safe)
@@ -181,7 +200,7 @@ def fetch_yahoo_history(
     out = out.rename(columns={"Close": "value"})
 
     out = out.reset_index()  # index becomes a column: Date
-    
+
     # Identify date column
     if "Date" in out.columns:
         date_col = "Date"
@@ -189,7 +208,7 @@ def fetch_yahoo_history(
         date_col = "index"
     else:
         date_col = out.columns[0]
-        
+
     out = out.rename(columns={date_col: "date"})
 
     # Ensure date is 1-d array/Series before to_datetime
@@ -197,8 +216,8 @@ def fetch_yahoo_history(
         # This happens if we have duplicate columns named 'date' or similar mess
         out = out.loc[:, ~out.columns.duplicated()]
         if isinstance(out["date"], pd.DataFrame):
-             # Still a DataFrame? Take first column
-             out["date"] = out["date"].iloc[:, 0]
+            # Still a DataFrame? Take first column
+            out["date"] = out["date"].iloc[:, 0]
 
     try:
         out["date"] = pd.to_datetime(out["date"], utc=True)
@@ -208,7 +227,7 @@ def fetch_yahoo_history(
             message=f"date conversion failed: {exc}",
             data=None,
             error_type=type(exc).__name__,
-            error_message=str(exc)
+            error_message=str(exc),
         )
 
     out["value"] = pd.to_numeric(out["value"], errors="coerce")

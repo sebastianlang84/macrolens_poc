@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from macrolens_poc.config import Settings
 from macrolens_poc.pipeline.run_series import run_series
 from macrolens_poc.sources.matrix import SeriesSpec
@@ -37,7 +38,7 @@ def mock_spec():
 @patch("macrolens_poc.pipeline.run_series.fetch_fred_series_observations")
 def test_run_series_uses_as_of_date(mock_fetch, mock_settings, mock_spec):
     """Verify that as_of_date is passed as observation_end to the provider."""
-    
+
     # Setup
     as_of = date(2023, 1, 1)
     mock_fetch.return_value = MagicMock(data=None, status="ok", message="ok")
@@ -61,7 +62,7 @@ def test_run_series_uses_as_of_date(mock_fetch, mock_settings, mock_spec):
 @patch("macrolens_poc.pipeline.run_series.fetch_fred_series_observations")
 def test_run_series_defaults_to_utc_today(mock_fetch, mock_settings, mock_spec):
     """Verify that without as_of_date, it defaults to UTC today."""
-    
+
     # Setup
     mock_fetch.return_value = MagicMock(data=None, status="ok", message="ok")
     expected_today = datetime.now(timezone.utc).date()

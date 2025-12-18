@@ -74,13 +74,20 @@ def test_fetch_yahoo_retries_download(monkeypatch) -> None:
     monkeypatch.setattr(yahoo.retry_call.__globals__["time"], "sleep", lambda *_: None)
     calls: list[int] = []
 
-    def _fake_download(*_, **__):
+    def _fake_history(*_, **__):
         calls.append(1)
         if len(calls) < 2:
             raise requests.Timeout("download timeout")
         return pd.DataFrame({"Close": [1.0]}, index=pd.date_range("2020-01-01", periods=1))
 
-    monkeypatch.setattr(yahoo.yf, "download", _fake_download)
+    class MockTicker:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def history(self, *args, **kwargs):
+            return _fake_history(*args, **kwargs)
+
+    monkeypatch.setattr(yahoo.yf, "Ticker", MockTicker)
 
     result = yahoo.fetch_yahoo_history(
         symbol="AAPL",
@@ -102,7 +109,14 @@ def test_fetch_yahoo_timeout_exhausted(monkeypatch) -> None:
     def _always_timeout(*_, **__):
         raise requests.Timeout("download timeout")
 
-    monkeypatch.setattr(yahoo.yf, "download", _always_timeout)
+    class MockTicker:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def history(self, *args, **kwargs):
+            return _always_timeout(*args, **kwargs)
+
+    monkeypatch.setattr(yahoo.yf, "Ticker", MockTicker)
 
     result = yahoo.fetch_yahoo_history(
         symbol="AAPL",

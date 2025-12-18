@@ -6,8 +6,14 @@ Hier ist der aktuelle Marktbericht im JSON-Format:
 
 Bitte erstelle eine Analyse dieses Berichts im Markdown-Format.
 
-Struktur der Analyse:
-1.  **Executive Summary**: Die wichtigsten Erkenntnisse in 3-5 Bulletpoints.
-2.  **Marktüberblick**: Detaillierte Analyse der wichtigsten Sektoren/Indikatoren.
-3.  **Risiko-Radar**: Hervorhebung von Warnsignalen oder ungewöhnlichen Bewegungen.
-4.  **Fazit**: Zusammenfassende Einschätzung der aktuellen Marktlage.
+Struktur der Analyse (bitte exakt so):
+
+1. Executive Summary (3–5 Bulletpoints)
+2. Marktüberblick (nach Tier 1 → Tier 2, nur was im JSON vorhanden ist)
+3. Risiko-Radar (max. 5 Bulletpoints, inkl. stale/missing Hinweise)
+4. Fazit (kurz, keine Spekulationen)
+
+Am Ende zwingend:
+
+> Confidence Score: Low/Medium/High
+> Begründung: 1–2 Sätze (Datenqualität + Konsistenz der Signale)

@@ -1,36 +1,39 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import typer
 
 from macrolens_poc.config import Settings, load_settings
+from macrolens_poc.llm.service import AnalysisService
 from macrolens_poc.logging_utils import (
     JsonlLogger,
     default_log_path,
     new_run_context,
     run_summary_event,
 )
-from macrolens_poc.llm.service import AnalysisService
 from macrolens_poc.pipeline import SeriesRunResult, run_series
 from macrolens_poc.report import generate_report_v1
 from macrolens_poc.sources import load_sources_matrix
 from macrolens_poc.sources.matrix import SeriesSpec
 from macrolens_poc.sources.matrix_status import (
     default_matrix_status_path,
+    identify_stale_series,
     load_matrix_status,
     merge_matrix_status,
     save_matrix_status,
 )
 from macrolens_poc.storage.metadata_db import (
     SeriesMetadataRecord,
-    init_db as init_metadata_db,
     upsert_series_metadata,
 )
+from macrolens_poc.storage.metadata_db import (
+    init_db as init_metadata_db,
+)
 
-app = typer.Typer(add_completion=False, help="macrolens_poc CLI (Milestone M0 skeleton)")
+app = typer.Typer(add_completion=False, help="macrolens_poc CLI (Milestone M4 POC)")
 
 
 def _ensure_dirs(settings: Settings) -> None:
@@ -94,7 +97,9 @@ def _log_series_run(logger: JsonlLogger, *, run_id: str, result: SeriesRunResult
         "message": result.message,
         "stored_path": str(result.stored_path) if result.stored_path is not None else None,
         "new_points": result.new_points,
-        "last_observation_date": result.last_observation_date.isoformat() if result.last_observation_date else None,
+        "last_observation_date": result.last_observation_date.isoformat()
+        if result.last_observation_date
+        else None,
         "run_at": result.run_at.isoformat(),
         "revision_overwrites_count": getattr(result, "revision_overwrites_count", 0),
     }
@@ -212,9 +217,7 @@ def run_all(
     results: list[SeriesRunResult] = []
 
     for spec in enabled:
-        result = run_series(
-            settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts
-        )
+        result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
         results.append(result)
         status_counts[result.status] = status_counts.get(result.status, 0) + 1
         total_new_points += result.new_points
@@ -230,7 +233,7 @@ def run_all(
         as_of=as_of,
     )
 
-    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
+    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
     summary["total_new_points"] = total_new_points
     summary.update(matrix_status_meta)
     logger.log(summary)
@@ -305,9 +308,7 @@ def run_one(
         }
     )
 
-    result = run_series(
-        settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts
-    )
+    result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
     _record_series_metadata(settings, spec, result)
     _log_series_run(logger, run_id=run_ctx.run_id, result=result)
 
@@ -322,7 +323,7 @@ def run_one(
     status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
     status_counts[result.status] = 1
 
-    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
+    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
     summary["total_new_points"] = result.new_points
     summary.update(matrix_status_meta)
     logger.log(summary)
@@ -365,14 +366,14 @@ def run_selected(
     )
 
     matrix_result = load_sources_matrix(settings.sources_matrix_path)
-    
+
     # Filter matrix for requested IDs
     selected_specs = []
     missing_ids = []
-    
+
     # Create a map for faster lookup
     spec_map = {s.id: s for s in matrix_result.matrix.series}
-    
+
     for tid in target_ids:
         if tid in spec_map:
             spec = spec_map[tid]
@@ -410,9 +411,7 @@ def run_selected(
     results: list[SeriesRunResult] = []
 
     for spec in selected_specs:
-        result = run_series(
-            settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts
-        )
+        result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
         results.append(result)
         status_counts[result.status] = status_counts.get(result.status, 0) + 1
         total_new_points += result.new_points
@@ -428,7 +427,7 @@ def run_selected(
         as_of=as_of,
     )
 
-    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts)
+    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
     summary["total_new_points"] = total_new_points
     summary.update(matrix_status_meta)
     logger.log(summary)
@@ -475,7 +474,11 @@ def report(
         }
     )
 
-    logger.log(run_summary_event(ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0}))
+    logger.log(
+        run_summary_event(
+            ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0}, as_of=run_ts
+        )
+    )
 
 
 @app.command()
@@ -522,7 +525,9 @@ def analyze(
                 "bytes_written": len(analysis_md),
             }
         )
-        logger.log(run_summary_event(ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0}))
+        logger.log(
+            run_summary_event(ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0})
+        )
 
     except Exception as e:
         logger.log(
@@ -533,8 +538,70 @@ def analyze(
                 "error_message": str(e),
             }
         )
-        logger.log(run_summary_event(ctx=run_ctx, status_counts={"ok": 0, "warn": 0, "error": 1, "missing": 0}))
+        logger.log(
+            run_summary_event(ctx=run_ctx, status_counts={"ok": 0, "warn": 0, "error": 1, "missing": 0})
+        )
+        raise typer.Exit(code=1) from None
+
+
+@app.command("matrix-status")
+def matrix_status_cmd(
+    ctx: typer.Context,
+    as_of: Optional[datetime] = typer.Option(None, "--as-of", help="Reference date (YYYY-MM-DD)"),
+) -> None:
+    """Show status of all series and warn about stale data."""
+
+    settings: Settings = ctx.obj["settings"]
+    matrix_status_path = default_matrix_status_path(settings.paths.data_dir)
+
+    if not matrix_status_path.exists():
+        typer.echo(f"No matrix status file found at {matrix_status_path}")
         raise typer.Exit(code=1)
+
+    status_file = load_matrix_status(matrix_status_path)
+    matrix_result = load_sources_matrix(settings.sources_matrix_path)
+
+    # Prepare overrides
+    overrides = {s.id: s.stale_days for s in matrix_result.matrix.series if s.stale_days is not None}
+
+    run_ts = as_of if as_of else datetime.now(timezone.utc)
+    ref_date = run_ts.date()
+
+    stale_series = identify_stale_series(
+        status_file=status_file,
+        ref_date=ref_date,
+        default_threshold=settings.stale_days_default,
+        overrides=overrides,
+    )
+
+    # Print summary table
+    typer.echo(f"\nMatrix Status (as of {ref_date})")
+    typer.echo("-" * 80)
+    typer.echo(f"{'Series ID':<25} | {'Status':<8} | {'Last Obs':<12} | {'Days Ago':<8}")
+    typer.echo("-" * 80)
+
+    for s_id in sorted(status_file.series.keys()):
+        entry = status_file.series[s_id]
+        last_obs = entry.last_observation_date or "N/A"
+
+        # Calculate days ago for display
+        days_ago = "N/A"
+        if entry.last_observation_date:
+            d = date.fromisoformat(entry.last_observation_date)
+            days_ago = str((ref_date - d).days)
+
+        typer.echo(f"{s_id:<25} | {entry.status:<8} | {last_obs:<12} | {days_ago:<8}")
+
+    if stale_series:
+        typer.echo("\n" + "!" * 80)
+        typer.echo(f"WARNING: {len(stale_series)} stale series detected!")
+        for s in stale_series:
+            typer.echo(
+                f"  - {s['series_id']}: last data {s['delta_days']} days ago (threshold: {s['threshold']})"
+            )
+        typer.echo("!" * 80 + "\n")
+    else:
+        typer.echo("\nNo stale series detected.\n")
 
 
 if __name__ == "__main__":

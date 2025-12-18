@@ -26,10 +26,10 @@
 
 > Ziel: Den generierten JSON-Report an ein LLM füttern, um den narrativen Report zu erhalten.
 
-- [ ] **Prompt-Engineering**: Template erstellen (System-Prompt "Makro-Stratege" + JSON-Context Injection).
-- [ ] **LLM-Client**: Minimaler Client (z. B. OpenAI API) mit Interface für einfachen Austausch.
-- [ ] **CLI `analyze`**: Neuer Befehl `macrolens-poc analyze`, der Report lädt, LLM fragt und `analysis-YYYYMMDD.md` speichert.
-- [ ] **Config**: API-Keys (z. B. `OPENAI_API_KEY`) in `.env` und Config-Klasse aufnehmen.
+- [x] **Prompt-Engineering**: Template erstellen (System-Prompt "Makro-Stratege" + JSON-Context Injection).
+- [x] **LLM-Client**: Minimaler Client (z. B. OpenAI API) mit Interface für einfachen Austausch.
+- [x] **CLI `analyze`**: Neuer Befehl `macrolens-poc analyze`, der Report lädt, LLM fragt und `analysis-YYYYMMDD.md` speichert.
+- [x] **Config**: API-Keys (z. B. `OPENAI_API_KEY`) in `.env` und Config-Klasse aufnehmen.
 
 ## Backlog (aus Review) — priorisiert, ausführbare Action Items
 
@@ -73,7 +73,7 @@
 - [ ] Follow-up (abhängig von Decision): **Warnungen/Breaking Changes absichern** (z. B. `auto_adjust`-FutureWarning)
   - DoD/Output: Unit-Test deckt Verhalten ab; Doku-Hinweis in [`README.md`](README.md:1) falls Nutzer betroffen sind.
 
-- [ ] **Pipeline TZ-Determinismus: `date.today()` eliminieren (reproduzierbarer „as_of“ / UTC-Regime)**
+- [x] **Pipeline TZ-Determinismus: `date.today()` eliminieren (reproduzierbarer „as_of“ / UTC-Regime)**
   - Kontext: `date.today()` in [`src/macrolens_poc/pipeline/run_series.py`](src/macrolens_poc/pipeline/run_series.py:1)
   - DoD/Output: Pipeline verwendet explizites „as_of“ (z. B. aus CLI/Config) oder strikt UTC-basiertes „now“; gleicher Input ⇒ gleicher Lookback-Zeitraum unabhängig von Local-TZ/Daylight-Saving; Unit-Test deckt Grenzfall „Run um Mitternacht“ ab.
 
@@ -83,56 +83,48 @@
   - Kontext: [`tests/test_m1_sources_matrix.py`](tests/test_m1_sources_matrix.py:1)
   - DoD/Output: Assertions sind robust gegen YAML-Key-Order/FS-Order (z. B. Vergleich über Sets/Maps oder vorheriges Sortieren); Test beschreibt klar, *was* Contract ist (Schema/Defaults) und *was nicht* (Input-Reihenfolge).
 
-- [ ] **Matrix-Loader: deterministische Ordnung/Normalisierung garantieren (Loader-Contract)**
+- [x] **Matrix-Loader: deterministische Ordnung/Normalisierung garantieren (Loader-Contract)**
   - DoD/Output: Loader liefert deterministisch sortierte Serien (z. B. by `id`); Test beweist deterministische Reihenfolge; keine Flakes.
 
-- [ ] **Matrix-Config-Regression: Beispiel-Datei muss immer validieren**
+- [x] **Matrix-Config-Regression: Beispiel-Datei muss immer validieren**
   - DoD/Output: Test lädt [`config/sources_matrix.yaml`](config/sources_matrix.yaml:1) und asserted Schema/Defaults; läuft deterministisch lokal/CI.
 
 ### 4) Docs & Repo-Hygiene (Entdriftung + Platzhalter entfernen)
 
-- [ ] Decision: **Single Source of Truth für Quickstart/Contracts festlegen (und Cross-Links definieren)**
+- [x] Decision: **Single Source of Truth für Quickstart/Contracts festlegen (und Cross-Links definieren)**
   - Option A: Nutzer-Doku/Quickstart in [`README.md`](README.md:1); Contributor-Regeln in [`AGENTS.md`](AGENTS.md:1); Anforderungen in [`docs/PRD.md`](docs/PRD.md:1); Status-Snapshot nur in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1)
-  - Option B: Alternative Aufteilung (explizit begründen) + Mapping-Tabelle in [`README.md`](README.md:1)
-  - DoD/Output: Entscheidung + Mapping-Tabelle (Dokument → Zweck/Owner) festgehalten.
+  - **Entscheidung:** Option A. Mapping-Tabelle in [`README.md`](README.md:5) integriert.
+- [x] Follow-up: **Quickstart/Contracts deduplizieren (README ↔ AGENTS ↔ PRD ↔ PROJECT_STATUS)**
+  - DoD/Output: keine widersprüchlichen Beispiele; README ist SSoT für Nutzer-Interaktion und Contracts.
+- [x] **PRD TODO-Block konsolidieren (doppelte TODOs vermeiden)**
+  - DoD/Output: PRD verlinkt auf [`TODO.md`](TODO.md:1); keine redundanten Aufgabenlisten im PRD.
+- [x] **CHANGELOG Release-Platzhalter bereinigen und Release-Flow konsistent machen**
+  - DoD/Output: `[Unreleased]` konsolidiert; keine toten Platzhalter.
 
-- [ ] Follow-up: **Quickstart/Contracts deduplizieren (README ↔ AGENTS ↔ PRD ↔ PROJECT_STATUS)**
-  - DoD/Output: keine widersprüchlichen Beispiele/Flags/Artefaktpfade; globaler `--config` Callback explizit genannt (vgl. [`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:35)); README enthält nur „current“ Quickstart, Snapshots wandern nach [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md:1).
-
-- [ ] **PRD TODO-Block konsolidieren (doppelte TODOs vermeiden)**
-  - Kontext: TODO-Block in [`docs/PRD.md`](docs/PRD.md:1)
-  - DoD/Output: PRD enthält nur Requirements/Scope; aktive Tasks sind in [`TODO.md`](TODO.md:1) (oder PRD verlinkt sauber auf TODO ohne Doppelung).
-
-- [ ] **CHANGELOG Release-Platzhalter bereinigen und Release-Flow konsistent machen**
-  - Kontext: Platzhalter/Release-Struktur in [`CHANGELOG.md`](CHANGELOG.md:1)
-  - DoD/Output: `[Unreleased]` bleibt Pflicht; keine toten Platzhalter; SemVer-Policy ist konsistent mit Repo-Konventionen.
-
-- [ ] **`.gitignore` härten (Artefakte zuverlässig ignorieren, `.gitkeep` intakt lassen)**
-  - Kontext: [`.gitignore`](.gitignore:1) + Artefakt-Dirs [`data/`](data/.gitkeep:1), [`logs/`](logs/.gitkeep:1), [`reports/`](reports/.gitkeep:1)
-  - DoD/Output: Run-Artefakte (Parquet/JSONL/Reports) sind sicher ignoriert; `.gitkeep` bleibt tracked; Doku referenziert die Artefakt-Orte konsistent.
-
-- [ ] **Version/Docstring aktualisieren (Package-Metadata konsistent machen)**
-  - Kontext: [`src/macrolens_poc/__init__.py`](src/macrolens_poc/__init__.py:1)
-  - DoD/Output: `__version__`/Package-Docstring (falls vorhanden) sind konsistent zu [`pyproject.toml`](pyproject.toml:1) und [`CHANGELOG.md`](CHANGELOG.md:1); keine veralteten Beschreibungen.
+- [x] **`.gitignore` härten (Artefakte zuverlässig ignorieren, `.gitkeep` intakt lassen)**
+  - DoD/Output: Run-Artefakte (Parquet/JSONL/Reports) sind sicher ignoriert; `.gitkeep` bleibt tracked.
+- [x] **Version/Docstring aktualisieren (Package-Metadata konsistent machen)**
+  - DoD/Output: `__version__` und Docstring in [`src/macrolens_poc/__init__.py`](src/macrolens_poc/__init__.py:1) sind aktuell.
 
 ### 5) Tooling-Standardisierung (fehlende Ruff/Black-Konfiguration)
 
-- [ ] Decision: **Format/Lint-Toolchain festlegen**
+- [x] Decision: **Format/Lint-Toolchain festlegen**
   - Option A: Ruff only (lint + formatter)
   - Option B: Black (format) + Ruff (lint)
   - DoD/Output: Entscheidung in [`TODO.md`](TODO.md:1) festgehalten + gewünschte Commands (inkl. Exit-Codes/CI-Use) benannt.
+  - **Entscheidung:** Option A (Ruff only).
 
-- [ ] Follow-up (abhängig von Decision): **Tooling zentral in [`pyproject.toml`](pyproject.toml:1) konfigurieren und Runner anbinden**
+- [x] Follow-up (abhängig von Decision): **Tooling zentral in [`pyproject.toml`](pyproject.toml:1) konfigurieren und Runner anbinden**
   - DoD/Output: Ruff/Black-Settings sind vollständig (Line length, target-version, excludes, per-file-ignores falls nötig); Task-Runner (vgl. [`Makefile`](Makefile:1)/[`justfile`](justfile:1)) bietet `lint` + `format` (falls getrennt) + `test`.
 
 ## Later — Monitoring, DX, Open Questions (bestehender Backlog)
 
-- [ ] (↪ siehe „Backlog (aus Review) / 2“) yfinance/Yahoo Robustheit: Fehler reproduzieren und Schema-/Kompatibilitäts-Fix für `TypeError: arg must be a list, tuple, 1-d array, or Series` (siehe [`src/macrolens_poc/sources/yahoo.py`](src/macrolens_poc/sources/yahoo.py:1))
-- [ ] (↪ siehe „Backlog (aus Review) / 2“) yfinance Dependency-Strategie: Version pinning/constraints evaluieren (ggf. lockfile/constraints) und `auto_adjust` FutureWarning im Verhalten absichern
-- [ ] FRED: Lookback/Serie-Frequenz-Handling verbessern (z. B. Default Lookback für niedrigfrequente Makroserien erhöhen oder frequenzabhängig wählen); dokumentierte Empfehlung aus Testlauf konsolidieren
-- [ ] Logging: FRED Error-Details in per-series Event/Report sicherstellen (bei `status=error` sollen `error_type`/`error_message` konsistent gesetzt werden; vgl. [`_log_series_run()`](src/macrolens_poc/cli.py:86))
+- [x] (↪ siehe „Backlog (aus Review) / 2“) yfinance/Yahoo Robustheit: Fehler reproduzieren und Schema-/Kompatibilitäts-Fix für `TypeError: arg must be a list, tuple, 1-d array, or Series` (siehe [`src/macrolens_poc/sources/yahoo.py`](src/macrolens_poc/sources/yahoo.py:1))
+- [x] (↪ siehe „Backlog (aus Review) / 2“) yfinance Dependency-Strategie: Version pinning/constraints evaluieren (ggf. lockfile/constraints) und `auto_adjust` FutureWarning im Verhalten absichern
+- [x] FRED: Lookback/Serie-Frequenz-Handling verbessern (z. B. Default Lookback für niedrigfrequente Makroserien erhöhen oder frequenzabhängig wählen); dokumentierte Empfehlung aus Testlauf konsolidieren
+- [x] Logging: FRED Error-Details in per-series Event/Report sicherstellen (bei `status=error` sollen `error_type`/`error_message` konsistent gesetzt werden; vgl. [`_log_series_run()`](src/macrolens_poc/cli.py:86))
 
-- [ ] Stale-series detection (z. B. „seit N Tagen unverändert“) + Matrix-Status-Export konsolidieren (`data/matrix_status.json`)
+- [x] Stale-series detection (z. B. „seit N Tagen unverändert“) + Matrix-Status-Export konsolidieren (`data/matrix_status.json`)
 - [x] SQLite Index für Metadaten (`data/metadata.sqlite`)
 - [x] DX: Makefile/justfile (z. B. `run_all`, `run_one`, `report`)
 - [x] Tests: Matrix-Loader + Storage-Merge (kritische Logik)

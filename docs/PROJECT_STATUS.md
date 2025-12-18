@@ -1,8 +1,10 @@
 # Project Status (Snapshot)
 
 ## Overview
-- **Status:** Feature Complete (POC).
+- **Status:** Feature Complete (POC) / Hardening Phase / Documentation Refinement.
 - **Milestone M4 (KI-Analyse) Completed:** `analyze` command integrates OpenAI for market summaries.
+- **Documentation Refined:** `README.md` und `docs/PRD.md` wurden aktualisiert (Matrix Extensions, Data Contract).
+- **Live-Test Analysis Completed:** Detaillierte Auswertung und Gap-Analyse unter [`docs/GAP_ANALYSIS_LIVE_TEST.md`](docs/GAP_ANALYSIS_LIVE_TEST.md:1).
 - **Core Pipeline:** Ingestion, Normalization, Storage (Parquet) fully functional.
 - **New Features:**
     - **Stale Detection:** Warns about outdated series based on configured frequency.
@@ -12,8 +14,13 @@
 
 ## Latest Test Run (2025-12-15)
 
+**Status:** Abgeschlossen & Analysiert.
+**Ergebnisse:** Siehe [`docs/GAP_ANALYSIS_LIVE_TEST.md`](docs/GAP_ANALYSIS_LIVE_TEST.md:1).
+
 Fakten aus dem durchgeführten Testlauf (Fixes & Stabilization):
 
+- **Data Quality:** Yahoo Finance Timezone-Issues identifiziert und behoben (Upgrade `yfinance`).
+- **LLM Analysis:** Bedarf für robustere Multi-Model Strategie erkannt (siehe [`docs/design/DESIGN_ROBUST_ANALYSIS.md`](docs/design/DESIGN_ROBUST_ANALYSIS.md:1)).
 - **Config Loading:** Erfolgreich verifiziert, dass `.env` Variablen korrekt geladen und priorisiert werden (Fix für `Config` Klasse).
 - **LLM Integration:** Erfolgreiche Tests mit OpenAI und OpenRouter (via `debug_llm_v2.py`). Modelle werden korrekt instanziiert und API-Keys sicher geladen.
 - Smoke war grün: `macrolens-poc --help` ok, `python3 -m pytest` → 22 passed.
@@ -54,9 +61,10 @@ Umgebungshinweis:
 
 ## Suggested Next Steps
 - [Done] Narrow retry conditions for yfinance and log retry attempts (attempt index + delay) for better diagnosability.
+- [Done] Refine LLM prompts for more specific investment horizon analysis.
+- **Implement Matrix Extensions:** Add new series defined in `docs/PRD.md` to `config/sources_matrix.yaml`.
 - Extend risk flag rule set and include explicit dependencies/assumptions in report metadata.
 - Consider a manifest/partitioning strategy if series count grows beyond the current PoC scope.
-- Refine LLM prompts for more specific investment horizon analysis.
 
 ## Review Cadence
 - Wöchentliches Update der offenen Fragen/Entscheidungen im Planning; Kurz-Check im Standup bis Klarheit zu Provider- und Coverage-Entscheidungen.

@@ -15,6 +15,8 @@ class FetchResult:
     status: str  # ok/warn/error/missing
     message: str
     data: Optional[pd.DataFrame]
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class RetryableHttpStatus(Exception):
@@ -44,11 +46,14 @@ def fetch_fred_series_observations(
     - FRED may return "." for missing values.
     - We use file_type=json.
     - Provider robustness: retry + exponential backoff on transient failures.
+    - Lookback buffer: we add 90 days to observation_start to ensure we have
+      enough data points for delta calculations (e.g. for monthly/quarterly series).
     """
 
     if not api_key:
         # Fallback: try env var directly if not passed
         import os
+
         api_key = os.getenv("FRED_API_KEY")
 
     if not api_key:

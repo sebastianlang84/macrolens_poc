@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class LLMProvider(ABC):
     @abstractmethod
     def generate_analysis(self, system_prompt: str, user_prompt: str, model: str | None = None) -> str:

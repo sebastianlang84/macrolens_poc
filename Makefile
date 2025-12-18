@@ -20,7 +20,7 @@ lint:
 	$(PY) -m ruff check src tests
 
 format:
-	$(PY) -m black src tests
+	$(PY) -m ruff format src tests
 
 smoke:
 	$(PY) -m pytest -q

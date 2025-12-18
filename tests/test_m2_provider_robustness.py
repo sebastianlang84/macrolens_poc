@@ -55,7 +55,16 @@ def test_run_series_yfinance_typeerror_is_captured_and_surfaces_error_fields(mon
 
     # Avoid real sleeps from retry/backoff in unit tests.
     monkeypatch.setattr(yahoo_module, "retry_call", no_retry)
-    monkeypatch.setattr(yahoo_module.yf, "download", yfinance_boom)
+
+    # Mock Ticker.history instead of yf.download
+    class MockTicker:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def history(self, *args, **kwargs):
+            return yfinance_boom(*args, **kwargs)
+
+    monkeypatch.setattr(yahoo_module.yf, "Ticker", MockTicker)
 
     settings = Settings()
     spec = SeriesSpec(id="x", provider="yfinance", provider_symbol="SPY", category="test", enabled=True)

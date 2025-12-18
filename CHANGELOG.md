@@ -9,6 +9,29 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 
 ## [Unreleased]
 
+### Added
+- **Feat:** Stale-Series Detection Logik in `matrix_status.py` implementiert.
+- **CLI:** Neuer Befehl `matrix-status` zur Anzeige des Status aller Serien inkl. Staleness-Warnungen.
+- **Tooling:** Standardisierung auf **Ruff** für Linting und Formatting (ersetzt Black/Flake8).
+- **Docs:** Gap-Analyse des Live-Tests ([`docs/GAP_ANALYSIS_LIVE_TEST.md`](docs/GAP_ANALYSIS_LIVE_TEST.md:1)) und Design für robuste Analysen ([`docs/design/DESIGN_ROBUST_ANALYSIS.md`](docs/design/DESIGN_ROBUST_ANALYSIS.md:1)).
+- **LLM:** Konzept für Multi-Model Redundanz (OpenAI + Gemini) ausgearbeitet.
+- **Tests:** Regression-Test für die Sources-Matrix ([`tests/test_matrix_regression.py`](tests/test_matrix_regression.py:1)) hinzugefügt.
+- **Tests:** Unit-Tests für Stale-Detection Logik in `tests/test_stale_detection.py`.
+
+### Changed
+- **Docs:** Dokumentation bereinigt und konsolidiert (Deduplizierung README/AGENTS/PRD).
+- **Docs:** `README.md` aktualisiert (Config Priority, Happy Path, Data Contract, Troubleshooting, SSoT-Mapping).
+- **Docs:** `docs/PRD.md` aktualisiert (Matrix Extensions, Data Contract, Idempotency, Report Logic).
+- **Pipeline:** Strikter TZ-Determinismus implementiert. Alle Zeitstempel basieren nun auf UTC oder einem expliziten `as_of` Datum.
+- **Source:** FRED Provider optimiert (Lookback-Puffer, Fehlerdetails, Spaltenkonsistenz).
+- **LLM:** Prompts (`system.md`, `user.md`) aktualisiert.
+- **Matrix-Status:** `SeriesStatusEntry` speichert nun `last_observation_date`.
+
+### Fixed
+- **Source:** Yahoo Finance Stabilisierung: Upgrade auf `yfinance>=0.2.50`, behobener `TypeError` und verbessertes Session-Handling.
+- **Source:** Yahoo Finance: `FutureWarning` bzgl. `auto_adjust` unterdrückt.
+- **Tests:** Veraltete Yahoo-Mocks auf `yf.Ticker.history` umgestellt.
+
 ## [0.4.1] - 2025-12-15
 
 ### Fixed

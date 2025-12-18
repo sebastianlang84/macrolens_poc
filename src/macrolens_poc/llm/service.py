@@ -4,10 +4,11 @@ from pathlib import Path
 from typing import Optional
 
 from macrolens_poc.config import Settings
-from macrolens_poc.llm.provider import LLMProvider
 from macrolens_poc.llm.openai_provider import OpenAIProvider
+from macrolens_poc.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
+
 
 class AnalysisService:
     def __init__(self, settings: Settings, provider: Optional[LLMProvider] = None):
@@ -33,7 +34,7 @@ class AnalysisService:
             # Convert back to string for injection (pretty printed for better LLM readability)
             report_json_str = json.dumps(report_data, indent=2)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in report file: {e}")
+            raise ValueError(f"Invalid JSON in report file: {e}") from e
 
         # 2. Load Prompts
         prompts_dir = Path(__file__).parent / "prompts"
@@ -41,7 +42,7 @@ class AnalysisService:
         user_prompt_path = prompts_dir / "user.md"
 
         if not system_prompt_path.exists() or not user_prompt_path.exists():
-             raise FileNotFoundError("Prompt templates (system.md/user.md) missing in package.")
+            raise FileNotFoundError("Prompt templates (system.md/user.md) missing in package.")
 
         system_prompt = system_prompt_path.read_text(encoding="utf-8")
         user_prompt_template = user_prompt_path.read_text(encoding="utf-8")
@@ -64,6 +65,6 @@ class AnalysisService:
                 results.append(f"## Analysis ({model})\n\n*Analysis failed: {e}*")
 
         if not results:
-             return "*No analysis generated (no models configured or all failed).*"
+            return "*No analysis generated (no models configured or all failed).*"
 
         return "\n\n---\n\n".join(results)

@@ -39,8 +39,13 @@ class JsonlLogger:
             f.write(line + "\n")
 
 
-def run_summary_event(*, ctx: RunContext, status_counts: Dict[str, int]) -> Dict[str, Any]:
-    ended_at_utc = datetime.now(timezone.utc)
+def run_summary_event(
+    *, ctx: RunContext, status_counts: Dict[str, int], as_of: Optional[datetime] = None
+) -> Dict[str, Any]:
+    ended_at_utc = as_of or datetime.now(timezone.utc)
+    if ended_at_utc.tzinfo is None:
+        ended_at_utc = ended_at_utc.replace(tzinfo=timezone.utc)
+
     duration_s = (ended_at_utc - ctx.started_at_utc).total_seconds()
 
     return {

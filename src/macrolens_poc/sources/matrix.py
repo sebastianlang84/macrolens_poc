@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, Field, ValidationError
-
 
 Provider = Literal["fred", "yfinance"]
 

@@ -1,6 +1,6 @@
 [project]
 name = "macrolens-poc"
-version = "0.1.0"
+version = "0.4.1"
 description = "Local Python PoC for macro/market data ingestion, normalization, storage and reporting."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,14 +14,13 @@ dependencies = [
   "requests>=2.32.0",
   "pandas>=2.2.0",
   "pyarrow>=16.0.0",
-  "yfinance==0.2.50",
+  "yfinance>=0.2.66",
   "openai>=1.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.2.0",
-  "black>=24.4.0",
   "ruff>=0.4.8",
 ]
 
@@ -46,8 +45,12 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
-ignore = []
+ignore = [
+  "B008", # do not perform function calls in argument defaults (Typer uses this)
+]
 
-[tool.black]
-line-length = 110
-target-version = ["py311"]
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

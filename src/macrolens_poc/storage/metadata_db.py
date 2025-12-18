@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional
-import sqlite3
 
 
 @dataclass(frozen=True)
@@ -132,9 +132,7 @@ def list_series_metadata(db_path: Path) -> List[SeriesMetadataRecord]:
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT * FROM series_metadata ORDER BY series_id"
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM series_metadata ORDER BY series_id").fetchall()
 
     return [_row_to_record(row) for row in rows]
 
@@ -144,9 +142,7 @@ def get_series_metadata(db_path: Path, series_id: str) -> Optional[SeriesMetadat
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM series_metadata WHERE series_id = ?", (series_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM series_metadata WHERE series_id = ?", (series_id,)).fetchone()
 
     if row is None:
         return None
@@ -198,9 +194,7 @@ def _row_to_record(row: sqlite3.Row) -> SeriesMetadataRecord:
         message=row["message"],
         last_run_at=datetime.fromisoformat(row["last_run_at"]),
         last_ok_at=datetime.fromisoformat(last_ok_at) if last_ok_at else None,
-        last_observation_date=date.fromisoformat(last_observation_date)
-        if last_observation_date
-        else None,
+        last_observation_date=date.fromisoformat(last_observation_date) if last_observation_date else None,
         stored_path=Path(stored_path) if stored_path else None,
         new_points=int(row["new_points"]),
     )

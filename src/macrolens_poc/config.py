@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator
 
 
 class PathsConfig(BaseModel):
@@ -18,13 +20,13 @@ class PathsConfig(BaseModel):
 class LLMConfig(BaseModel):
     # API Key wird primär aus Environment Variable (OPENAI_API_KEY) gelesen
     # Kann optional auch hier gesetzt werden (aber nicht empfohlen für Secrets)
-    api_key: Optional[str] = Field(default=None)
+    api_key: Optional[SecretStr] = Field(default=None)
 
-    # Modell-Auswahl (z.B. gpt-4-turbo, gpt-3.5-turbo)
-    model: str = Field(default="gpt-4-turbo")
+    # Modell-Auswahl (z.B. openai/gpt-5.2)
+    model: str = Field(default="openai/gpt-5.2")
 
     # Liste der Modelle für redundante Analyse
-    models: list[str] = Field(default_factory=lambda: ["gpt-4-turbo"])
+    models: list[str] = Field(default_factory=lambda: ["openai/gpt-5.2"])
 
     # Base URL für OpenAI-kompatible APIs (z.B. OpenRouter, LocalAI)
     base_url: Optional[str] = Field(default=None)
@@ -63,6 +65,15 @@ class Settings(BaseModel):
     stale_days_default: int = Field(default=5)
 
     fred_api_key: Optional[str] = Field(default=None)
+
+    @field_validator("report_tz", "data_tz")
+    @classmethod
+    def validate_timezone(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, Exception) as exc:
+            raise ValueError(f"Invalid timezone: {v}") from exc
+        return v
 
     llm: LLMConfig = Field(default_factory=LLMConfig)
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
@@ -65,6 +66,49 @@ def _format_md_number(x: Optional[float]) -> str:
     return s
 
 
+def find_nearest_value(
+    by_day: dict[datetime.date, float],
+    target_day: datetime.date,
+    tolerance_days: int = 2,
+    mode: str = "lookback_first",
+) -> Optional[float]:
+    """Find value for target_day or nearest within tolerance.
+
+    Rules (lookback_first):
+    1. Exact match wins.
+    2. Minimal abs(d - target_day) wins.
+    3. Tie-break: earlier date wins.
+    4. If mode='lookback_first', future dates are only used if no past dates found in tolerance.
+    """
+    if not by_day:
+        return None
+
+    if target_day in by_day:
+        return by_day[target_day]
+
+    candidates = []
+    for d, v in by_day.items():
+        diff = (d - target_day).days
+        if abs(diff) <= tolerance_days:
+            candidates.append((d, v, diff))
+
+    if not candidates:
+        return None
+
+    if mode == "lookback_first":
+        past = [c for c in candidates if c[2] < 0]
+        if past:
+            # Sort by abs(diff) ascending, then by date ascending (earlier wins)
+            past.sort(key=lambda x: (abs(x[2]), x[0]))
+            return past[0][1]
+        # If no past, fall through to nearest (future)
+
+    # Nearest logic (also used as fallback for lookback_first)
+    # Sort by abs(diff) ascending, then by date ascending (earlier wins)
+    candidates.sort(key=lambda x: (abs(x[2]), x[0]))
+    return candidates[0][1]
+
+
 def _series_last_and_deltas(
     df: Optional[pd.DataFrame],
     *,
@@ -109,10 +153,11 @@ def _series_last_and_deltas(
     deltas: dict[int, Optional[float]] = {}
     for w in windows_days:
         target_day = last_day - timedelta(days=w)
-        if target_day not in by_day:
+        val_at_target = find_nearest_value(by_day, target_day, tolerance_days=2)
+        if val_at_target is None:
             deltas[w] = None
-            continue
-        deltas[w] = last_val - by_day[target_day]
+        else:
+            deltas[w] = last_val - val_at_target
 
     return last_val, deltas
 
@@ -223,12 +268,20 @@ def write_report_files(*, report: ReportV1, reports_dir: Path) -> tuple[Path, Pa
 
 def generate_report_v1(*, settings: Settings, as_of: Optional[datetime] = None) -> ReportV1WriteResult:
     """Generate Report v1 based on stored series files."""
+    logger = logging.getLogger(__name__)
 
     run_ts = as_of if as_of else datetime.now(timezone.utc)
     if run_ts.tzinfo is None:
         run_ts = run_ts.replace(tzinfo=timezone.utc)
 
-    report_tz = ZoneInfo(settings.report_tz)
+    try:
+        report_tz = ZoneInfo(settings.report_tz)
+    except (ZoneInfoNotFoundError, Exception) as exc:
+        logger.warning(
+            f"Invalid report_tz '{settings.report_tz}', falling back to UTC. Error: {exc}"
+        )
+        report_tz = timezone.utc
+
     as_of_date = run_ts.astimezone(report_tz).date()
     as_of_date_str = as_of_date.strftime("%Y-%m-%d")
 
@@ -242,8 +295,14 @@ def generate_report_v1(*, settings: Settings, as_of: Optional[datetime] = None) 
     table: list[SeriesRow] = []
     rows_by_id: dict[str, SeriesRow] = {}
 
+    series_dir = (settings.paths.data_dir / "series").resolve()
     for spec in enabled:
-        p = settings.paths.data_dir / "series" / f"{spec.id}.parquet"
+        p = (series_dir / f"{spec.id}.parquet").resolve()
+
+        # Path Traversal Protection
+        if not p.is_relative_to(series_dir):
+            raise ValueError(f"Path traversal detected for series id: {spec.id}")
+
         df = load_series(p)
 
         last, deltas = _series_last_and_deltas(df, windows_days=[1, 5, 21])
@@ -252,6 +311,11 @@ def generate_report_v1(*, settings: Settings, as_of: Optional[datetime] = None) 
         st_entry = status_map.get(spec.id)
         status = st_entry.status if st_entry else "unknown"
         status_msg = st_entry.last_error if st_entry else None
+
+        # Enrich status message with threshold if stale
+        if status == "warn" and status_msg and "stale:" in status_msg and "(threshold:" not in status_msg:
+            threshold = spec.stale_days if spec.stale_days is not None else settings.stale_days_default
+            status_msg = f"{status_msg} (threshold: {threshold})"
 
         row = SeriesRow(
             id=spec.id,

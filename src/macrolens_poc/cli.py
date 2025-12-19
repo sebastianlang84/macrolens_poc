@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -35,14 +36,28 @@ app = typer.Typer(add_completion=False, help="macrolens_poc CLI (Milestone M4 PO
 
 
 def _ensure_dirs(settings: Settings) -> None:
-    settings.paths.data_dir.mkdir(parents=True, exist_ok=True)
-    settings.paths.logs_dir.mkdir(parents=True, exist_ok=True)
-    settings.paths.reports_dir.mkdir(parents=True, exist_ok=True)
+    """Ensure required directories exist and are within the workspace."""
+    base_dir = Path.cwd().resolve()
+
+    for p in [
+        settings.paths.data_dir,
+        settings.paths.logs_dir,
+        settings.paths.reports_dir,
+    ]:
+        resolved = p.resolve()
+        if not resolved.is_relative_to(base_dir):
+            raise ValueError(f"Path {p} is outside of base directory {base_dir}")
+        p.mkdir(parents=True, exist_ok=True)
+
+    # Also check metadata db path
+    if not settings.paths.metadata_db.resolve().is_relative_to(base_dir):
+        raise ValueError(f"Metadata DB path {settings.paths.metadata_db} is outside of base directory {base_dir}")
+
     init_metadata_db(settings.paths.metadata_db)
 
 
 def _record_series_metadata(
-    settings: Settings, spec: SeriesSpec, result: SeriesRunResult
+    settings: Settings, spec: SeriesSpec, result: SeriesRunResult, logger: JsonlLogger, run_id: str
 ) -> None:
     metadata_record = SeriesMetadataRecord(
         series_id=spec.id,
@@ -64,14 +79,25 @@ def _record_series_metadata(
         new_points=result.new_points,
     )
 
-    upsert_series_metadata(settings.paths.metadata_db, metadata_record)
+    try:
+        upsert_series_metadata(settings.paths.metadata_db, metadata_record)
+    except sqlite3.Error as e:
+        logger.log(
+            {
+                "event": "metadata_write_failed",
+                "run_id": run_id,
+                "series_id": spec.id,
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            }
+        )
 
 
 @app.callback()
 def main(
     ctx: typer.Context,
     config: Optional[Path] = typer.Option(
-        None,
+        Path("config/config.yaml") if Path("config/config.yaml").exists() else None,
         "--config",
         exists=True,
         dir_okay=False,
@@ -181,62 +207,63 @@ def run_all(
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
 
-    # Deterministic run time
-    run_ts = as_of if as_of else datetime.now(timezone.utc)
-    if run_ts.tzinfo is None:
-        run_ts = run_ts.replace(tzinfo=timezone.utc)
+    with logger:
+        # Deterministic run time
+        run_ts = as_of if as_of else datetime.now(timezone.utc)
+        if run_ts.tzinfo is None:
+            run_ts = run_ts.replace(tzinfo=timezone.utc)
 
-    logger.log(
-        {
-            "event": "command_start",
-            "command": "run-all",
-            "run_id": run_ctx.run_id,
-            "data_tz": settings.data_tz,
-            "report_tz": settings.report_tz,
-            "sources_matrix_path": str(settings.sources_matrix_path),
-            "lookback_days": lookback_days,
-            "as_of": run_ts.isoformat(),
-        }
-    )
+        logger.log(
+            {
+                "event": "command_start",
+                "command": "run-all",
+                "run_id": run_ctx.run_id,
+                "data_tz": settings.data_tz,
+                "report_tz": settings.report_tz,
+                "sources_matrix_path": str(settings.sources_matrix_path),
+                "lookback_days": lookback_days,
+                "as_of": run_ts.isoformat(),
+            }
+        )
 
-    matrix_result = load_sources_matrix(settings.sources_matrix_path)
-    enabled = [s for s in matrix_result.matrix.series if s.enabled]
+        matrix_result = load_sources_matrix(settings.sources_matrix_path)
+        enabled = [s for s in matrix_result.matrix.series if s.enabled]
 
-    logger.log(
-        {
-            "event": "matrix_loaded",
-            "run_id": run_ctx.run_id,
-            "series_total": len(matrix_result.matrix.series),
-            "series_enabled": len(enabled),
-            "path": str(matrix_result.path),
-        }
-    )
+        logger.log(
+            {
+                "event": "matrix_loaded",
+                "run_id": run_ctx.run_id,
+                "series_total": len(matrix_result.matrix.series),
+                "series_enabled": len(enabled),
+                "path": str(matrix_result.path),
+            }
+        )
 
-    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
-    total_new_points = 0
-    results: list[SeriesRunResult] = []
+        status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
+        total_new_points = 0
+        results: list[SeriesRunResult] = []
 
-    for spec in enabled:
-        result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
-        results.append(result)
-        status_counts[result.status] = status_counts.get(result.status, 0) + 1
-        total_new_points += result.new_points
+        for spec in enabled:
+            result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
+            results.append(result)
+            status_counts[result.status] = status_counts.get(result.status, 0) + 1
+            total_new_points += result.new_points
 
-        _record_series_metadata(settings, spec, result)
-        _log_series_run(logger, run_id=run_ctx.run_id, result=result)
+            _record_series_metadata(settings, spec, result, logger, run_ctx.run_id)
+            _log_series_run(logger, run_id=run_ctx.run_id, result=result)
 
-    matrix_status_meta = _persist_matrix_status(
-        logger=logger,
-        run_id=run_ctx.run_id,
-        data_dir=settings.paths.data_dir,
-        results=results,
-        as_of=as_of,
-    )
+        matrix_status_meta = _persist_matrix_status(
+            logger=logger,
+            run_id=run_ctx.run_id,
+            data_dir=settings.paths.data_dir,
+            results=results,
+            as_of=as_of,
+        )
 
-    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
-    summary["total_new_points"] = total_new_points
-    summary.update(matrix_status_meta)
-    logger.log(summary)
+        summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
+        summary["total_new_points"] = total_new_points
+        summary.update(matrix_status_meta)
+        logger.log(summary)
 
 
 @app.command("run-one")
@@ -254,79 +281,80 @@ def run_one(
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
 
-    # Deterministic run time
-    run_ts = as_of if as_of else datetime.now(timezone.utc)
-    if run_ts.tzinfo is None:
-        run_ts = run_ts.replace(tzinfo=timezone.utc)
+    with logger:
+        # Deterministic run time
+        run_ts = as_of if as_of else datetime.now(timezone.utc)
+        if run_ts.tzinfo is None:
+            run_ts = run_ts.replace(tzinfo=timezone.utc)
 
-    logger.log(
-        {
-            "event": "command_start",
-            "command": "run-one",
-            "run_id": run_ctx.run_id,
-            "series_id": series_id,
-            "data_tz": settings.data_tz,
-            "report_tz": settings.report_tz,
-            "sources_matrix_path": str(settings.sources_matrix_path),
-            "lookback_days": lookback_days,
-            "as_of": run_ts.isoformat(),
-        }
-    )
-
-    matrix_result = load_sources_matrix(settings.sources_matrix_path)
-    matches = [s for s in matrix_result.matrix.series if s.id == series_id]
-
-    if not matches:
         logger.log(
             {
-                "event": "series_not_found",
+                "event": "command_start",
+                "command": "run-one",
                 "run_id": run_ctx.run_id,
                 "series_id": series_id,
-                "path": str(matrix_result.path),
+                "data_tz": settings.data_tz,
+                "report_tz": settings.report_tz,
+                "sources_matrix_path": str(settings.sources_matrix_path),
+                "lookback_days": lookback_days,
+                "as_of": run_ts.isoformat(),
             }
         )
-        raise typer.Exit(code=2)
 
-    spec = matches[0]
-    if not spec.enabled:
+        matrix_result = load_sources_matrix(settings.sources_matrix_path)
+        matches = [s for s in matrix_result.matrix.series if s.id == series_id]
+
+        if not matches:
+            logger.log(
+                {
+                    "event": "series_not_found",
+                    "run_id": run_ctx.run_id,
+                    "series_id": series_id,
+                    "path": str(matrix_result.path),
+                }
+            )
+            raise typer.Exit(code=2)
+
+        spec = matches[0]
+        if not spec.enabled:
+            logger.log(
+                {
+                    "event": "series_disabled",
+                    "run_id": run_ctx.run_id,
+                    "series_id": series_id,
+                }
+            )
+            raise typer.Exit(code=3)
+
         logger.log(
             {
-                "event": "series_disabled",
+                "event": "series_selected",
                 "run_id": run_ctx.run_id,
-                "series_id": series_id,
+                "series_id": spec.id,
+                "provider": spec.provider,
+                "provider_symbol": spec.provider_symbol,
             }
         )
-        raise typer.Exit(code=3)
 
-    logger.log(
-        {
-            "event": "series_selected",
-            "run_id": run_ctx.run_id,
-            "series_id": spec.id,
-            "provider": spec.provider,
-            "provider_symbol": spec.provider_symbol,
-        }
-    )
+        result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
+        _record_series_metadata(settings, spec, result, logger, run_ctx.run_id)
+        _log_series_run(logger, run_id=run_ctx.run_id, result=result)
 
-    result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
-    _record_series_metadata(settings, spec, result)
-    _log_series_run(logger, run_id=run_ctx.run_id, result=result)
+        matrix_status_meta = _persist_matrix_status(
+            logger=logger,
+            run_id=run_ctx.run_id,
+            data_dir=settings.paths.data_dir,
+            results=[result],
+            as_of=as_of,
+        )
 
-    matrix_status_meta = _persist_matrix_status(
-        logger=logger,
-        run_id=run_ctx.run_id,
-        data_dir=settings.paths.data_dir,
-        results=[result],
-        as_of=as_of,
-    )
+        status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
+        status_counts[result.status] = 1
 
-    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
-    status_counts[result.status] = 1
-
-    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
-    summary["total_new_points"] = result.new_points
-    summary.update(matrix_status_meta)
-    logger.log(summary)
+        summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
+        summary["total_new_points"] = result.new_points
+        summary.update(matrix_status_meta)
+        logger.log(summary)
 
 
 @app.command("run-selected")
@@ -344,93 +372,94 @@ def run_selected(
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
 
-    # Deterministic run time
-    run_ts = as_of if as_of else datetime.now(timezone.utc)
-    if run_ts.tzinfo is None:
-        run_ts = run_ts.replace(tzinfo=timezone.utc)
+    with logger:
+        # Deterministic run time
+        run_ts = as_of if as_of else datetime.now(timezone.utc)
+        if run_ts.tzinfo is None:
+            run_ts = run_ts.replace(tzinfo=timezone.utc)
 
-    target_ids = [s.strip() for s in series_ids.split(",") if s.strip()]
+        target_ids = [s.strip() for s in series_ids.split(",") if s.strip()]
 
-    logger.log(
-        {
-            "event": "command_start",
-            "command": "run-selected",
-            "run_id": run_ctx.run_id,
-            "series_ids": target_ids,
-            "data_tz": settings.data_tz,
-            "report_tz": settings.report_tz,
-            "sources_matrix_path": str(settings.sources_matrix_path),
-            "lookback_days": lookback_days,
-            "as_of": run_ts.isoformat(),
-        }
-    )
-
-    matrix_result = load_sources_matrix(settings.sources_matrix_path)
-
-    # Filter matrix for requested IDs
-    selected_specs = []
-    missing_ids = []
-
-    # Create a map for faster lookup
-    spec_map = {s.id: s for s in matrix_result.matrix.series}
-
-    for tid in target_ids:
-        if tid in spec_map:
-            spec = spec_map[tid]
-            if spec.enabled:
-                selected_specs.append(spec)
-            else:
-                logger.log(
-                    {
-                        "event": "series_disabled",
-                        "run_id": run_ctx.run_id,
-                        "series_id": tid,
-                    }
-                )
-        else:
-            missing_ids.append(tid)
-
-    if missing_ids:
         logger.log(
             {
-                "event": "series_not_found",
+                "event": "command_start",
+                "command": "run-selected",
                 "run_id": run_ctx.run_id,
-                "missing_ids": missing_ids,
-                "path": str(matrix_result.path),
+                "series_ids": target_ids,
+                "data_tz": settings.data_tz,
+                "report_tz": settings.report_tz,
+                "sources_matrix_path": str(settings.sources_matrix_path),
+                "lookback_days": lookback_days,
+                "as_of": run_ts.isoformat(),
             }
         )
-        # We continue with the valid ones, but log the missing ones
 
-    if not selected_specs and not missing_ids:
-        # No valid specs found and no missing IDs (empty input?)
-        logger.log({"event": "no_series_selected", "run_id": run_ctx.run_id})
-        raise typer.Exit(code=2)
+        matrix_result = load_sources_matrix(settings.sources_matrix_path)
 
-    status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
-    total_new_points = 0
-    results: list[SeriesRunResult] = []
+        # Filter matrix for requested IDs
+        selected_specs = []
+        missing_ids = []
 
-    for spec in selected_specs:
-        result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
-        results.append(result)
-        status_counts[result.status] = status_counts.get(result.status, 0) + 1
-        total_new_points += result.new_points
+        # Create a map for faster lookup
+        spec_map = {s.id: s for s in matrix_result.matrix.series}
 
-        _record_series_metadata(settings, spec, result)
-        _log_series_run(logger, run_id=run_ctx.run_id, result=result)
+        for tid in target_ids:
+            if tid in spec_map:
+                spec = spec_map[tid]
+                if spec.enabled:
+                    selected_specs.append(spec)
+                else:
+                    logger.log(
+                        {
+                            "event": "series_disabled",
+                            "run_id": run_ctx.run_id,
+                            "series_id": tid,
+                        }
+                    )
+            else:
+                missing_ids.append(tid)
 
-    matrix_status_meta = _persist_matrix_status(
-        logger=logger,
-        run_id=run_ctx.run_id,
-        data_dir=settings.paths.data_dir,
-        results=results,
-        as_of=as_of,
-    )
+        if missing_ids:
+            logger.log(
+                {
+                    "event": "series_not_found",
+                    "run_id": run_ctx.run_id,
+                    "missing_ids": missing_ids,
+                    "path": str(matrix_result.path),
+                }
+            )
+            # We continue with the valid ones, but log the missing ones
 
-    summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
-    summary["total_new_points"] = total_new_points
-    summary.update(matrix_status_meta)
-    logger.log(summary)
+        if not selected_specs and not missing_ids:
+            # No valid specs found and no missing IDs (empty input?)
+            logger.log({"event": "no_series_selected", "run_id": run_ctx.run_id})
+            raise typer.Exit(code=2)
+
+        status_counts = {"ok": 0, "warn": 0, "error": 0, "missing": 0}
+        total_new_points = 0
+        results: list[SeriesRunResult] = []
+
+        for spec in selected_specs:
+            result = run_series(settings=settings, spec=spec, lookback_days=lookback_days, as_of=run_ts)
+            results.append(result)
+            status_counts[result.status] = status_counts.get(result.status, 0) + 1
+            total_new_points += result.new_points
+
+            _record_series_metadata(settings, spec, result, logger, run_ctx.run_id)
+            _log_series_run(logger, run_id=run_ctx.run_id, result=result)
+
+        matrix_status_meta = _persist_matrix_status(
+            logger=logger,
+            run_id=run_ctx.run_id,
+            data_dir=settings.paths.data_dir,
+            results=results,
+            as_of=as_of,
+        )
+
+        summary = run_summary_event(ctx=run_ctx, status_counts=status_counts, as_of=run_ts)
+        summary["total_new_points"] = total_new_points
+        summary.update(matrix_status_meta)
+        logger.log(summary)
 
 
 @app.command()
@@ -444,41 +473,42 @@ def report(
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
 
-    run_ts = as_of if as_of else datetime.now(timezone.utc)
-    if run_ts.tzinfo is None:
-        run_ts = run_ts.replace(tzinfo=timezone.utc)
+    with logger:
+        run_ts = as_of if as_of else datetime.now(timezone.utc)
+        if run_ts.tzinfo is None:
+            run_ts = run_ts.replace(tzinfo=timezone.utc)
 
-    logger.log(
-        {
-            "event": "command_start",
-            "command": "report",
-            "run_id": run_ctx.run_id,
-            "data_tz": settings.data_tz,
-            "report_tz": settings.report_tz,
-            "sources_matrix_path": str(settings.sources_matrix_path),
-            "as_of": run_ts.isoformat(),
-        }
-    )
-
-    result = generate_report_v1(settings=settings, as_of=run_ts)
-
-    logger.log(
-        {
-            "event": "report_generated",
-            "run_id": run_ctx.run_id,
-            "as_of_date": result.report.meta.get("as_of_date"),
-            "md_path": str(result.md_path),
-            "json_path": str(result.json_path),
-            "series_count": len(result.report.table),
-            "risk_flags": result.report.risk_flags,
-        }
-    )
-
-    logger.log(
-        run_summary_event(
-            ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0}, as_of=run_ts
+        logger.log(
+            {
+                "event": "command_start",
+                "command": "report",
+                "run_id": run_ctx.run_id,
+                "data_tz": settings.data_tz,
+                "report_tz": settings.report_tz,
+                "sources_matrix_path": str(settings.sources_matrix_path),
+                "as_of": run_ts.isoformat(),
+            }
         )
-    )
+
+        result = generate_report_v1(settings=settings, as_of=run_ts)
+
+        logger.log(
+            {
+                "event": "report_generated",
+                "run_id": run_ctx.run_id,
+                "as_of_date": result.report.meta.get("as_of_date"),
+                "md_path": str(result.md_path),
+                "json_path": str(result.json_path),
+                "series_count": len(result.report.table),
+                "risk_flags": result.report.risk_flags,
+            }
+        )
+
+        logger.log(
+            run_summary_event(
+                ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0}, as_of=run_ts
+            )
+        )
 
 
 @app.command()
@@ -495,53 +525,88 @@ def analyze(
     run_ctx = new_run_context()
     logger = JsonlLogger(default_log_path(settings.paths.logs_dir, now_utc=run_ctx.started_at_utc))
 
-    override_models = [m.strip() for m in models.split(",") if m.strip()] if models else None
-    effective_models = override_models if override_models else settings.llm.models
-
-    logger.log(
-        {
-            "event": "command_start",
-            "command": "analyze",
-            "run_id": run_ctx.run_id,
-            "report_file": str(report_file),
-            "output": str(output),
-            "models": effective_models,
-        }
-    )
-
-    try:
-        service = AnalysisService(settings)
-        analysis_md = service.analyze_report(report_file, override_models=override_models)
-
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(analysis_md, encoding="utf-8")
+    with logger:
+        override_models = [m.strip() for m in models.split(",") if m.strip()] if models else None
+        effective_models = override_models if override_models else settings.llm.models
 
         logger.log(
             {
-                "event": "analysis_generated",
+                "event": "command_start",
+                "command": "analyze",
                 "run_id": run_ctx.run_id,
                 "report_file": str(report_file),
                 "output": str(output),
-                "bytes_written": len(analysis_md),
+                "models": effective_models,
             }
-        )
-        logger.log(
-            run_summary_event(ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0})
         )
 
-    except Exception as e:
-        logger.log(
-            {
-                "event": "analysis_failed",
-                "run_id": run_ctx.run_id,
-                "error_type": type(e).__name__,
-                "error_message": str(e),
-            }
-        )
-        logger.log(
-            run_summary_event(ctx=run_ctx, status_counts={"ok": 0, "warn": 0, "error": 1, "missing": 0})
-        )
-        raise typer.Exit(code=1) from None
+        # OpenRouter Key Check
+        api_key = settings.llm.api_key.get_secret_value() if settings.llm.api_key else None
+        if api_key and api_key.startswith("sk-or-v1-"):
+            base_url = settings.llm.base_url
+            if not base_url or "openrouter.ai" not in base_url:
+                typer.secho(
+                    "\n[!] WARNING: OpenRouter API key detected (sk-or-v1-...), but base_url is not set to openrouter.ai.",
+                    fg=typer.colors.YELLOW,
+                    bold=True,
+                )
+                typer.secho(
+                    f"    Current base_url: {base_url or 'OpenAI Default'}",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.secho(
+                    "    LLM requests will likely fail. Ensure LLM_BASE_URL=https://openrouter.ai/api/v1 is set.\n",
+                    fg=typer.colors.YELLOW,
+                )
+
+        # Fix 2.4: Validate output path
+        resolved_output = output.resolve()
+        reports_dir = settings.paths.reports_dir.resolve()
+        if not resolved_output.is_relative_to(reports_dir):
+            logger.log(
+                {
+                    "event": "analysis_failed",
+                    "run_id": run_ctx.run_id,
+                    "error_type": "SecurityError",
+                    "error_message": f"Output path {output} must be within {settings.paths.reports_dir}",
+                }
+            )
+            typer.secho(f"Error: Output path must be within {settings.paths.reports_dir}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+        try:
+            service = AnalysisService(settings)
+            analysis_md = service.analyze_report(report_file, override_models=override_models)
+
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(analysis_md, encoding="utf-8")
+
+            logger.log(
+                {
+                    "event": "analysis_generated",
+                    "run_id": run_ctx.run_id,
+                    "report_file": str(report_file),
+                    "output": str(output),
+                    "bytes_written": len(analysis_md),
+                }
+            )
+            logger.log(
+                run_summary_event(ctx=run_ctx, status_counts={"ok": 1, "warn": 0, "error": 0, "missing": 0})
+            )
+
+        except Exception as e:
+            logger.log(
+                {
+                    "event": "analysis_failed",
+                    "run_id": run_ctx.run_id,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                }
+            )
+            logger.log(
+                run_summary_event(ctx=run_ctx, status_counts={"ok": 0, "warn": 0, "error": 1, "missing": 0})
+            )
+            raise typer.Exit(code=1) from None
 
 
 @app.command("matrix-status")
@@ -587,8 +652,11 @@ def matrix_status_cmd(
         # Calculate days ago for display
         days_ago = "N/A"
         if entry.last_observation_date:
-            d = date.fromisoformat(entry.last_observation_date)
-            days_ago = str((ref_date - d).days)
+            try:
+                d = date.fromisoformat(entry.last_observation_date)
+                days_ago = str((ref_date - d).days)
+            except ValueError:
+                days_ago = "unknown"
 
         typer.echo(f"{s_id:<25} | {entry.status:<8} | {last_obs:<12} | {days_ago:<8}")
 

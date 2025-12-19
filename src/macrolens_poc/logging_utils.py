@@ -27,16 +27,39 @@ class JsonlLogger:
     """Minimal JSONL logger.
 
     Writes one JSON object per line.
+    Supports context manager to keep file handle open.
     """
 
     def __init__(self, path: Path) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._file = None
+
+    def __enter__(self) -> JsonlLogger:
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
+    def open(self) -> None:
+        if self._file is None:
+            self._file = self.path.open("a", encoding="utf-8")
+
+    def close(self) -> None:
+        if self._file is not None:
+            self._file.close()
+            self._file = None
 
     def log(self, event: Dict[str, Any]) -> None:
         line = json.dumps(event, ensure_ascii=False, sort_keys=True)
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
+        if self._file is not None:
+            self._file.write(line + "\n")
+            self._file.flush()
+        else:
+            # Fallback to open/close if not used as context manager
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
 
 
 def run_summary_event(

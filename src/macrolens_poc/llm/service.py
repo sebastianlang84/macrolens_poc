@@ -33,6 +33,15 @@ class AnalysisService:
                 report_data = json.load(f)
             # Convert back to string for injection (pretty printed for better LLM readability)
             report_json_str = json.dumps(report_data, indent=2)
+
+            # Fix 4.4: Token-Limits & Größenbeschränkung
+            max_chars = getattr(self.settings.llm, "max_report_chars", 50000)
+            if len(report_json_str) > max_chars:
+                logger.warning(
+                    f"Report JSON too large ({len(report_json_str)} chars), truncating to {max_chars} chars."
+                )
+                report_json_str = report_json_str[:max_chars] + "\n... [TRUNCATED]"
+
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in report file: {e}") from e
 

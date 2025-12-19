@@ -30,6 +30,7 @@
 - [x] **LLM-Client**: Minimaler Client (z. B. OpenAI API) mit Interface für einfachen Austausch.
 - [x] **CLI `analyze`**: Neuer Befehl `macrolens-poc analyze`, der Report lädt, LLM fragt und `analysis-YYYYMMDD.md` speichert.
 - [x] **Config**: API-Keys (z. B. `OPENAI_API_KEY`) in `.env` und Config-Klasse aufnehmen.
+- [x] **Multi-Model Support**: Integration von OpenRouter und Fallback-Logik für Reasoning-Modelle.
 
 ## Backlog (aus Review) — priorisiert, ausführbare Action Items
 
@@ -117,6 +118,28 @@
 - [x] Follow-up (abhängig von Decision): **Tooling zentral in [`pyproject.toml`](pyproject.toml:1) konfigurieren und Runner anbinden**
   - DoD/Output: Ruff/Black-Settings sind vollständig (Line length, target-version, excludes, per-file-ignores falls nötig); Task-Runner (vgl. [`Makefile`](Makefile:1)/[`justfile`](justfile:1)) bietet `lint` + `format` (falls getrennt) + `test`.
 
+## Vulnerabilities & Security (aus [`docs/VULNERABILITIES.md`](docs/VULNERABILITIES.md:1))
+
+- [x] **Robustheit**: Fehlerbehandlung beim Lesen von Parquet-Dateien implementieren ([`src/macrolens_poc/storage/parquet_store.py:34`](src/macrolens_poc/storage/parquet_store.py:34)) (Fix 1.1)
+- [ ] **Robustheit**: Yahoo-Provider MultiIndex-Logik härten ([`src/macrolens_poc/sources/yahoo.py:145`](src/macrolens_poc/sources/yahoo.py:145))
+- [x] **Sicherheit**: Secrets in Config als `SecretStr` markieren ([`src/macrolens_poc/config.py:21`](src/macrolens_poc/config.py:21)) (Fix 2.1)
+- [x] **Sicherheit**: Pfadvalidierung in CLI (`_ensure_dirs`) hinzufügen ([`src/macrolens_poc/cli.py:39`](src/macrolens_poc/cli.py:39)) (Fix 2.2)
+- [x] **Datenintegrität**: Atomare Schreibvorgänge für Parquet-Dateien (Temp-File + Rename) ([`src/macrolens_poc/storage/parquet_store.py:152`](src/macrolens_poc/storage/parquet_store.py:152)) (Fix 3.1)
+- [ ] **LLM**: Modell-Identifier konsolidieren und fiktive Defaults entfernen ([`src/macrolens_poc/config.py:24`](src/macrolens_poc/config.py:24))
+- [x] **Performance**: Logging-I/O optimieren (File-Handle offen halten) ([`src/macrolens_poc/logging_utils.py:38`](src/macrolens_poc/logging_utils.py:38)) (Fix 5.1)
+
+- [x] **Sicherheit**: Path Traversal via `SeriesSpec.id` in Parquet-Pfaden verhindern ([`src/macrolens_poc/pipeline/run_series.py:176`](src/macrolens_poc/pipeline/run_series.py:176)) (Fix 2.3)
+- [x] **Sicherheit**: `analyze`-Output-Pfad validieren (kein Truncate/Overwrite beliebiger Dateien) ([`src/macrolens_poc/cli.py:517`](src/macrolens_poc/cli.py:517)) (Fix 2.4)
+- [x] **LLM**: Prompt-Injection mitigieren (Report-JSON nicht 1:1 in Prompt übernehmen) ([`src/macrolens_poc/llm/service.py:58`](src/macrolens_poc/llm/service.py:58)) (Fix 4.3)
+- [x] **LLM/DoS**: Größen-/Token-Limits für Report-Injection + konservative Defaults für `max_tokens` ([`src/macrolens_poc/llm/openai_provider.py:82`](src/macrolens_poc/llm/openai_provider.py:82)) (Fix 4.4)
+- [ ] **LLM/Privacy**: `base_url` Trust/Allowlist + Endpoint-Logging reduzieren/redacten ([`src/macrolens_poc/config.py:108`](src/macrolens_poc/config.py:108))
+- [x] **Robustheit**: `matrix-status` gegen ungültige Datumsstrings härten (`date.fromisoformat`) ([`src/macrolens_poc/cli.py:591`](src/macrolens_poc/cli.py:591)) (Fix 1.3)
+- [x] **Robustheit**: Report-TZ validieren/abfangen (ungültige `ZoneInfo`) ([`src/macrolens_poc/report/v1.py:231`](src/macrolens_poc/report/v1.py:231)) (Fix 1.4)
+- [x] **Robustheit/DoS lokal**: SQLite Busy-/Timeout-Handling + CLI-Fehlerkapselung für Metadaten-Upsert ([`src/macrolens_poc/storage/metadata_db.py:68`](src/macrolens_poc/storage/metadata_db.py:68)) (Fix 1.5)
+- [ ] **Datenintegrität**: Report-Artefakte (MD/JSON) atomar schreiben (Temp-File + Rename) ([`src/macrolens_poc/report/v1.py:209`](src/macrolens_poc/report/v1.py:209))
+- [x] **Supply Chain/Repro**: Lockfile/Constraints einführen (Dependencies nicht nur `>=`) ([`pyproject.toml:7`](pyproject.toml:7)) (Fix 6.1)
+- [ ] **Observability/Datenintegrität**: JSONL-Logfile pro Run eindeutig machen (kein Tages-Interleaving) ([`src/macrolens_poc/logging_utils.py:23`](src/macrolens_poc/logging_utils.py:23))
+
 ## Later — Monitoring, DX, Open Questions (bestehender Backlog)
 
 - [x] (↪ siehe „Backlog (aus Review) / 2“) yfinance/Yahoo Robustheit: Fehler reproduzieren und Schema-/Kompatibilitäts-Fix für `TypeError: arg must be a list, tuple, 1-d array, or Series` (siehe [`src/macrolens_poc/sources/yahoo.py`](src/macrolens_poc/sources/yahoo.py:1))
@@ -129,6 +152,9 @@
 - [x] DX: Makefile/justfile (z. B. `run_all`, `run_one`, `report`)
 - [x] Tests: Matrix-Loader + Storage-Merge (kritische Logik)
 - [ ] Open Questions sammeln/aktualisieren (Yahoo-Ersatz, weitere Regionen/Serien)
+- [x] Individuelle `stale_days` pro Serie in `sources_matrix.yaml` ermöglichen
+- [x] Lookback-Logik für Deltas bei lückenhaften Daten verbessern (intelligente Suche nach dem letzten validen Datenpunkt)
+- [ ] CLI-Warnung bei fehlendem `--config` Flag für OpenRouter-Keys (Verbesserung der UX bei Secret-Handling)
 
 ## Docs — README/CHANGELOG Pflege
 

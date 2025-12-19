@@ -21,6 +21,7 @@ series:
     transform: none
     notes: "US CPI (FRED CPIAUCSL)"
     enabled: true
+    stale_days: 45
 
   - id: us_pce
     provider: fred
@@ -32,6 +33,7 @@ series:
     transform: none
     notes: "US PCE price index (FRED PCEPI)"
     enabled: true
+    stale_days: 45
 
   - id: us_unemployment_rate
     provider: fred
@@ -43,6 +45,7 @@ series:
     transform: none
     notes: "US unemployment rate (FRED UNRATE)"
     enabled: true
+    stale_days: 45
 
   - id: us_fed_funds
     provider: fred
@@ -65,6 +68,7 @@ series:
     transform: none
     notes: "M2 money stock (FRED M2SL)"
     enabled: true
+    stale_days: 45
 
   - id: us_treasury_10y
     provider: fred
@@ -120,6 +124,7 @@ series:
     transform: none
     notes: "Industrial Production: Total Index (FRED INDPRO) - Monthly, proxy for activity"
     enabled: true
+    stale_days: 45
 
   - id: oil_wti
     provider: fred

@@ -1,5 +1,6 @@
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 from openai import APIConnectionError, APIError, OpenAI, RateLimitError
 
@@ -13,143 +14,132 @@ logger = logging.getLogger(__name__)
 class OpenAIProvider(LLMProvider):
     def __init__(self, config: LLMConfig):
         self.config = config
-        if not self.config.api_key:
-            logger.warning("OpenAI API key not provided. LLM calls will fail.")
+        api_key = self._resolve_api_key()
+        if not api_key:
+            logger.error("No API key found for OpenAIProvider (config or env).")
+            self.client = None
+        else:
+            kwargs = self._build_client_kwargs(api_key)
+            self.client = OpenAI(**kwargs)
+            logger.info(
+                f"Initialized OpenAIProvider (base_url={self.config.base_url}, model={self.config.model})"
+            )
 
-        logger.info(
-            f"Initializing OpenAIProvider with base_url={self.config.base_url}, model={self.config.model}"
-        )
-        # OpenRouter requires "Authorization: Bearer <key>" which OpenAI client handles.
-        # However, some proxies/gateways might need extra headers.
-        # For OpenRouter, it's good practice to send HTTP-Referer and X-Title.
+    def _resolve_api_key(self) -> Optional[str]:
+        """Resolves API key from config or environment."""
+        if self.config.api_key:
+            key = self.config.api_key.get_secret_value()
+            if key and key.strip():
+                return key.strip()
 
-        # Ensure we don't pass None as base_url if it's not set, let OpenAI default or handle it.
-        # But for OpenRouter we expect it to be set.
+        import os
 
-        kwargs = {
-            "api_key": self.config.api_key,
-        }
+        env_key = os.getenv("OPENAI_API_KEY")
+        if env_key and env_key.strip():
+            return env_key.strip()
+
+        return None
+
+    def _build_client_kwargs(self, api_key: str) -> Dict[str, Any]:
+        """Builds arguments for OpenAI client initialization."""
+        kwargs = {"api_key": api_key}
         if self.config.base_url:
             kwargs["base_url"] = self.config.base_url
 
-        # Add OpenRouter specific headers if using OpenRouter
-        if self.config.base_url and "openrouter" in self.config.base_url:
-            kwargs["default_headers"] = {
-                "HTTP-Referer": "https://github.com/sebas/macrolens_poc",
-                "X-Title": "Macrolens PoC",
-            }
+            # OpenRouter specific headers
+            parsed = urlparse(self.config.base_url)
+            if parsed.netloc.endswith("openrouter.ai"):
+                kwargs["default_headers"] = {
+                    "HTTP-Referer": "https://github.com/sebas/macrolens_poc",
+                    "X-Title": "Macrolens PoC",
+                }
+        return kwargs
 
-        # Explicitly set api_key to avoid "No cookie auth credentials found" if env var is missing/confusing
-        # The OpenAI client might be trying to look for other auth methods if api_key is None,
-        # but we check that above.
-        # However, if api_key is passed as None to OpenAI(), it might trigger the error.
-        # We already check self.config.api_key above, but let's be double sure.
+    def _is_transient_error(self, e: Exception) -> bool:
+        """Determines if an error is transient and should be retried."""
+        if isinstance(e, (APIConnectionError, RateLimitError)):
+            return True
+        if isinstance(e, APIError):
+            # Retry on 5xx, but not on 4xx (except 429 which is RateLimitError)
+            status_code = getattr(e, "status_code", None)
+            if status_code and 500 <= status_code < 600:
+                return True
+        return False
 
-        if not kwargs.get("api_key"):
-            # This should have been caught by the check at the start of __init__, but just in case
-            logger.error("API Key is empty in kwargs for OpenAI client!")
-            # If we don't have an API key, we can't initialize the client properly for OpenRouter
-            # But we might be able to rely on env vars if they are set correctly in the process
-            # However, we prefer explicit passing.
+    def _build_request_kwargs(
+        self, system_prompt: str, user_prompt: str, model: str, include_reasoning: bool = True
+    ) -> Dict[str, Any]:
+        """Builds arguments for the chat.completions.create call."""
+        kwargs = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": self.config.temperature,
+        }
 
-        # IMPORTANT: If api_key is None, OpenAI client might try to find it in env vars.
-        # If it finds nothing, it might default to some other auth method or fail.
-        # The "No cookie auth credentials found" error suggests it might be falling back to Azure
-        # or some other auth flow?
-        # Or maybe it's just a misleading error message when key is missing.
+        if self.config.max_tokens:
+            kwargs["max_tokens"] = self.config.max_tokens
 
-        # Force api_key to be a string if it's None, to prevent OpenAI from looking elsewhere
-        if kwargs.get("api_key") is None:
-            # Try to get from env directly as last resort
-            import os
+        extra_body = {}
+        # OpenRouter: be lenient with parameters to avoid 404s on unsupported ones
+        if self.config.base_url and "openrouter.ai" in self.config.base_url:
+            extra_body["provider"] = {"require_parameters": False}
 
-            env_key = os.getenv("OPENAI_API_KEY")
-            if env_key:
-                kwargs["api_key"] = env_key
-            else:
-                # If still None, we are in trouble. But let's see.
-                pass
-
-        self.client = OpenAI(**kwargs)
-
-    def generate_analysis(self, system_prompt: str, user_prompt: str, model: Optional[str] = None) -> str:
-        """
-        Generates analysis using OpenAI Chat Completion API with retries.
-        """
-        if not self.config.api_key:
-            raise ValueError("OpenAI API key is missing. Cannot generate analysis.")
-
-        target_model = model or self.config.model
-
-        def _call_openai():
-            # Prepare arguments
-            kwargs = {
-                "model": target_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": self.config.temperature,
-            }
-
-            # Optional: max_tokens
-            if self.config.max_tokens:
-                kwargs["max_tokens"] = self.config.max_tokens
-
-            # Prepare extra_body for provider-specific parameters (OpenRouter etc.)
-            extra_body = {}
-
-            # 1. Provider Flag for OpenRouter
-            # "Set provider: { "require_parameters": true }, so OpenRouter doesn't ignore parameters."
-            if self.config.base_url and "openrouter" in self.config.base_url:
-                extra_body["provider"] = {"require_parameters": True}
-
-            # 2. Reasoning Parameters
-            # Logic based on model name
+        if include_reasoning:
             reasoning_param = {}
-
-            # OpenAI (gpt-5.1/5.2, o1, o3)
-            if any(m in target_model for m in ["gpt-5", "o1", "o3"]):
-                # Task: Set reasoning: { "effort": "high" } (or "xhigh")
-                # We use the config value if present, else default to "high"
-                effort = self.config.reasoning_effort or "high"
-                reasoning_param["effort"] = effort
-
-                # Task: Increase max_tokens
-                # If max_tokens is not explicitly set in config, we ensure a high default for reasoning models
-                if not kwargs.get("max_tokens"):
-                    kwargs["max_tokens"] = 10000  # High default for reasoning
-
-            # Gemini (gemini-3-pro)
-            elif "gemini" in target_model and "pro" in target_model:
-                # Task: Set reasoning: { "max_tokens": 8000 }
-                # This controls the internal reasoning budget
-                reasoning_param["max_tokens"] = 8000
-
-                # Task: Increase max_tokens accordingly
-                # The total max_tokens must accommodate reasoning + output
-                if not kwargs.get("max_tokens"):
-                    kwargs["max_tokens"] = 12000  # 8000 reasoning + 4000 output buffer
+            # Strategy mapping instead of fragile string contains
+            if "gpt-5" in model or "o1" in model or "o3" in model:
+                reasoning_param["effort"] = self.config.reasoning_effort or "high"
+                # Note: max_tokens here is output tokens. Reasoning budget is internal.
+            elif "gemini" in model and "pro" in model:
+                # Gemini reasoning budget (internal)
+                reasoning_param["max_tokens"] = 1000  # Conservative default
 
             if reasoning_param:
                 extra_body["reasoning"] = reasoning_param
 
-            if extra_body:
-                kwargs["extra_body"] = extra_body
+        if extra_body:
+            kwargs["extra_body"] = extra_body
 
+        return kwargs
+
+    def generate_analysis(self, system_prompt: str, user_prompt: str, model: Optional[str] = None) -> str:
+        """Generates analysis with retries and reasoning fallback."""
+        if not self.client:
+            raise ValueError("OpenAI client not initialized (missing API key).")
+
+        target_model = model or self.config.model
+
+        def _attempt(include_reasoning: bool):
+            kwargs = self._build_request_kwargs(system_prompt, user_prompt, target_model, include_reasoning)
             response = self.client.chat.completions.create(**kwargs)
             return response.choices[0].message.content
 
-        try:
-            # Reuse simple_retry logic for robustness
-            # We retry on RateLimitError and APIConnectionError specifically
-            # APIError is a catch-all, might be risky to retry blindly but okay for PoC
-            return simple_retry(
-                _call_openai,
-                max_attempts=3,
-                delay=2.0,
-                exceptions=(RateLimitError, APIConnectionError, APIError),
-            )
-        except Exception as e:
-            logger.error(f"Failed to generate analysis from OpenAI: {e}")
-            raise
+        # Main execution loop with transient retry and reasoning fallback
+        last_exception = None
+        for attempt_no in range(3):
+            try:
+                # Try with reasoning first
+                return _attempt(include_reasoning=True)
+            except Exception as e:
+                last_exception = e
+                # If it's a 400/404 (likely unsupported reasoning params), retry immediately without reasoning
+                status_code = getattr(e, "status_code", None)
+                if status_code in (400, 404):
+                    logger.warning(f"Reasoning params likely unsupported for {target_model} (HTTP {status_code}). Retrying without reasoning.")
+                    try:
+                        return _attempt(include_reasoning=False)
+                    except Exception as e2:
+                        # If even without reasoning it fails, we treat it as a hard error for this attempt
+                        last_exception = e2
+
+                if not self._is_transient_error(last_exception):
+                    break
+                
+                import time
+                time.sleep(2.0 * (attempt_no + 1))
+
+        logger.error(f"Failed to generate analysis for {target_model}: {last_exception}")
+        raise last_exception

@@ -33,7 +33,8 @@ def init_db(path: Path) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    with sqlite3.connect(path) as conn:
+    with sqlite3.connect(path, timeout=10.0) as conn:
+        conn.execute("PRAGMA busy_timeout = 10000")
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS series_metadata (
@@ -65,7 +66,8 @@ def upsert_series_metadata(db_path: Path, record: SeriesMetadataRecord) -> None:
 
     payload = _serialize_record(record)
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite3.connect(db_path, timeout=10.0) as conn:
+        conn.execute("PRAGMA busy_timeout = 10000")
         conn.execute(
             """
             INSERT INTO series_metadata (
@@ -130,7 +132,8 @@ def upsert_series_metadata(db_path: Path, record: SeriesMetadataRecord) -> None:
 def list_series_metadata(db_path: Path) -> List[SeriesMetadataRecord]:
     """Return all series metadata records ordered by series_id."""
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite3.connect(db_path, timeout=10.0) as conn:
+        conn.execute("PRAGMA busy_timeout = 10000")
         conn.row_factory = sqlite3.Row
         rows = conn.execute("SELECT * FROM series_metadata ORDER BY series_id").fetchall()
 
@@ -140,7 +143,8 @@ def list_series_metadata(db_path: Path) -> List[SeriesMetadataRecord]:
 def get_series_metadata(db_path: Path, series_id: str) -> Optional[SeriesMetadataRecord]:
     """Return one series metadata entry if present."""
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite3.connect(db_path, timeout=10.0) as conn:
+        conn.execute("PRAGMA busy_timeout = 10000")
         conn.row_factory = sqlite3.Row
         row = conn.execute("SELECT * FROM series_metadata WHERE series_id = ?", (series_id,)).fetchone()
 

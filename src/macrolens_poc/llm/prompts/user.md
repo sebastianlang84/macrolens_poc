@@ -1,8 +1,8 @@
 Hier ist der aktuelle Marktbericht im JSON-Format:
 
-```json
+<report_data>
 {{ report_json }}
-```
+</report_data>
 
 Bitte erstelle eine Analyse dieses Berichts im Markdown-Format.
 

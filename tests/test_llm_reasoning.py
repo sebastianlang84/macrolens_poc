@@ -13,8 +13,8 @@ def mock_openai_client():
 
 
 def test_openai_reasoning_params(mock_openai_client):
-    """Test that gpt-5/o1 models get the correct reasoning parameters."""
-    config = LLMConfig(api_key="test-key", model="gpt-5.1-preview", reasoning_effort="high")
+    """Test that gpt-5 models get the correct reasoning parameters."""
+    config = LLMConfig(api_key="test-key", model="openai/gpt-5.2", reasoning_effort="high")
     provider = OpenAIProvider(config)
 
     # Mock the client instance and create method
@@ -28,11 +28,9 @@ def test_openai_reasoning_params(mock_openai_client):
     # Verify call arguments
     call_kwargs = mock_instance.chat.completions.create.call_args.kwargs
 
-    assert call_kwargs["model"] == "gpt-5.1-preview"
+    assert call_kwargs["model"] == "openai/gpt-5.2"
     assert "extra_body" in call_kwargs
     assert call_kwargs["extra_body"]["reasoning"]["effort"] == "high"
-    # Check default max_tokens for reasoning
-    assert call_kwargs["max_tokens"] == 10000
 
 
 def test_gemini_reasoning_params(mock_openai_client):
@@ -52,17 +50,15 @@ def test_gemini_reasoning_params(mock_openai_client):
     call_kwargs = mock_instance.chat.completions.create.call_args.kwargs
 
     assert "extra_body" in call_kwargs
-    # Check provider flag
-    assert call_kwargs["extra_body"]["provider"]["require_parameters"] is True
+    # Check provider flag (we expect False for OpenRouter leniency)
+    assert call_kwargs["extra_body"]["provider"]["require_parameters"] is False
     # Check reasoning params
-    assert call_kwargs["extra_body"]["reasoning"]["max_tokens"] == 8000
-    # Check total max_tokens
-    assert call_kwargs["max_tokens"] == 12000
+    assert call_kwargs["extra_body"]["reasoning"]["max_tokens"] == 1000
 
 
 def test_standard_model_no_reasoning(mock_openai_client):
     """Test that standard models don't get reasoning parameters."""
-    config = LLMConfig(api_key="test-key", model="gpt-4-turbo")
+    config = LLMConfig(api_key="test-key", model="anthropic/claude-4.5-sonnet")
     provider = OpenAIProvider(config)
 
     mock_instance = mock_openai_client.return_value

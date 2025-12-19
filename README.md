@@ -30,7 +30,10 @@ python3 -m venv .venv
 . .venv/bin/activate
 
 # Hinweis zur Umgebung: systemweit kann nur `python3` verfügbar sein; in der aktivierten venv ist i. d. R. auch `python` vorhanden.
-python3 -m pip install -e '.[dev]'
+# Für eine reproduzierbare Installation (Lockfile):
+python3 -m pip install -r requirements.lock
+# Danach das Paket im Editable-Modus installieren (ohne Abhängigkeiten erneut zu lösen):
+python3 -m pip install -e '.[dev]' --no-deps
 
 macrolens-poc --help
 python3 -m pytest
@@ -223,9 +226,9 @@ Der `analyze` Befehl nutzt ein oder mehrere LLMs, um die generierten Reports zus
 ### Konfiguration
 
 Voraussetzung:
-- `OPENAI_API_KEY` in `.env` gesetzt.
-- `LLM_MODELS`: Liste der Modelle (z. B. `gpt-4o,claude-3-5-sonnet`).
-- `LLM_BASE_URL`: Optional für OpenRouter/LocalAI.
+- `OPENAI_API_KEY` in `.env` gesetzt (OpenAI Key oder OpenRouter Key `sk-or-v1-...`).
+- `LLM_MODELS`: Liste der Modelle (z. B. `openai/gpt-5.2,google/gemini-3-pro-preview`).
+- `LLM_BASE_URL`: Optional für OpenRouter (`https://openrouter.ai/api/v1`) oder LocalAI.
 
 ### Usage
 

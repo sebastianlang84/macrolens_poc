@@ -4,14 +4,28 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
+import re
+
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 Provider = Literal["fred", "yfinance"]
 
 
 class SeriesSpec(BaseModel):
     id: str
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, v: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9._-]+$", v):
+            raise ValueError(
+                f"Invalid series id '{v}': only alphanumeric, '.', '_', and '-' allowed."
+            )
+        if ".." in v:
+            raise ValueError(f"Invalid series id '{v}': '..' not allowed.")
+        return v
+
     provider: Provider
     provider_symbol: str
 

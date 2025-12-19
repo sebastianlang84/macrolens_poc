@@ -173,7 +173,12 @@ def run_series(
             run_at=run_ts,
         )
 
-    out_path = settings.paths.data_dir / "series" / f"{spec.id}.parquet"
+    series_dir = (settings.paths.data_dir / "series").resolve()
+    out_path = (series_dir / f"{spec.id}.parquet").resolve()
+
+    # Path Traversal Protection
+    if not out_path.is_relative_to(series_dir):
+        raise ValueError(f"Path traversal detected for series id: {spec.id}")
 
     try:
         store_result: StoreResult = store_series(out_path, normalized)

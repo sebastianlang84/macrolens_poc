@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 REVISION_SAMPLE_MAX = 10
 
@@ -31,7 +36,11 @@ def load_series(path: Path) -> Optional[pd.DataFrame]:
     if not path.exists():
         return None
 
-    df = pd.read_parquet(path)
+    try:
+        df = pd.read_parquet(path)
+    except Exception as e:
+        logger.warning(f"Failed to read parquet file {path}: {e}. Treating as non-existent.")
+        return None
     if df.empty:
         return df
 
@@ -149,7 +158,15 @@ def store_series(path: Path, incoming: pd.DataFrame) -> StoreResult:
     )
     rows_after = len(merged)
 
-    merged.to_parquet(path, index=False)
+    # Atomic write: write to temp file then rename
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    try:
+        merged.to_parquet(tmp_path, index=False)
+        os.replace(tmp_path, path)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
 
     return StoreResult(
         path=path,

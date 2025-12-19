@@ -10,6 +10,11 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 ## [Unreleased]
 
 ### Added
+- Automatischer Default für `--config config/config.yaml` im CLI, falls die Datei existiert.
+- CLI-Warnung im `analyze` Kommando, wenn ein OpenRouter-Key (`sk-or-v1-`) erkannt wird, aber die `base_url` nicht auf OpenRouter zeigt.
+- Robuste Delta-Berechnung mit `find_nearest_value` (Toleranz +/- 2 Tage) in `report/v1.py`, um Gaps an Wochenenden/Feiertagen zu handhaben.
+- Individuelle `stale_days` Overrides in `config/sources_matrix.yaml` für monatliche Serien (us_cpi, us_pce, us_unemployment_rate, us_m2, us_indpro).
+- Anzeige des Staleness-Schwellenwerts im Report (`src/macrolens_poc/report/v1.py`).
 - **Feat:** Stale-Series Detection Logik in `matrix_status.py` implementiert.
 - **CLI:** Neuer Befehl `matrix-status` zur Anzeige des Status aller Serien inkl. Staleness-Warnungen.
 - **Tooling:** Standardisierung auf **Ruff** für Linting und Formatting (ersetzt Black/Flake8).
@@ -29,6 +34,22 @@ Das Format orientiert sich an **Keep a Changelog** und **Semantic Versioning**:
 - **Matrix-Status:** `SeriesStatusEntry` speichert nun `last_observation_date`.
 
 ### Fixed
+- **LLM:** Synchronisation der Modell-Identifier in Code, Tests und Dokumentation mit der zentralen `config.yaml` (Entfernung veralteter/fiktiver Modelle).
+- **Tests:** Syntaxfehler in `tests/test_llm_reasoning.py` behoben.
+- **Robustness:** Fix 1.1 (Robustes Lesen): `pd.read_parquet` in `try-except` gekapselt ([`src/macrolens_poc/storage/parquet_store.py`](src/macrolens_poc/storage/parquet_store.py:34)).
+- **Robustness:** Fix 1.3 (Robustes Datums-Parsing): `date.fromisoformat` in `matrix-status` Kommando gehärtet ([`src/macrolens_poc/cli.py`](src/macrolens_poc/cli.py:591)).
+- **Robustness:** Fix 1.4 (Zeitzonen-Validierung): `ZoneInfo` Validierung in Report-Generierung und Config hinzugefügt ([`src/macrolens_poc/report/v1.py`](src/macrolens_poc/report/v1.py:231)).
+- **Robustness:** Fix 1.5: SQLite Busy-Timeout (10s) und Fehlerkapselung beim Metadaten-Upsert im CLI implementiert ([`docs/VULNERABILITIES.md`](docs/VULNERABILITIES.md:30)).
+- **Security:** Fix 2.1 (Secret-Exposition): Secrets in Config als `SecretStr` markiert ([`src/macrolens_poc/config.py`](src/macrolens_poc/config.py:21)).
+- **Security:** Fix 2.2: Pfadvalidierung in `_ensure_dirs` (CLI) gegen Path Traversal (Resolve + `is_relative_to`).
+- **Security:** Fix 2.3: Path Traversal Schutz für `SeriesSpec.id` via Pydantic-Validierung und Pfad-Normalisierung in Pipeline/Report.
+- **Security:** Fix 2.4: Pfadvalidierung im `analyze` Kommando (CLI) zur Einschränkung des `--output` Pfads auf das Reports-Verzeichnis.
+- **Data Integrity:** Fix 3.1 (Atomares Schreiben): Parquet-Dateien werden nun atomar via Temp-File + `os.replace` geschrieben ([`src/macrolens_poc/storage/parquet_store.py`](src/macrolens_poc/storage/parquet_store.py:152)).
+- **LLM:** Fix 4.3 (Prompt-Härtung): Klare Delimiter (`<report_data>`) und Sicherheitsanweisungen im System-Prompt zur Vermeidung von Prompt-Injection.
+- **LLM:** Fix 4.4 (Token-Limits): Größenbeschränkung für injizierte Reports (max. 50k Zeichen) und konservativere `max_tokens` Defaults für Reasoning-Modelle.
+- **LLM:** `OpenAIProvider` Robustheit: Automatischer Fallback bei nicht unterstützten Reasoning-Parametern (HTTP 400/404) und verbesserte OpenRouter-Kompatibilität (`require_parameters: False`).
+- **Performance:** Fix 5.1: Logging-I/O Optimierung. `JsonlLogger` hält nun den File-Handle während eines Runs offen (Context Manager), um Overhead zu reduzieren ([`docs/VULNERABILITIES.md`](docs/VULNERABILITIES.md:109)).
+- **Supply Chain:** Fix 6.1: Einführung von `requirements.lock` für reproduzierbare Installationen ([`docs/VULNERABILITIES.md`](docs/VULNERABILITIES.md:116)).
 - **Source:** Yahoo Finance Stabilisierung: Upgrade auf `yfinance>=0.2.50`, behobener `TypeError` und verbessertes Session-Handling.
 - **Source:** Yahoo Finance: `FutureWarning` bzgl. `auto_adjust` unterdrückt.
 - **Tests:** Veraltete Yahoo-Mocks auf `yf.Ticker.history` umgestellt.
